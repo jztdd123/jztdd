@@ -6,7 +6,7 @@
     </div>
     <div class="inline-drawer-content" style="display: none;">
 
-      </!-->
+      <!-- API 设置 --></!-->
       <div class="inline-drawer">
         <div class="inline-drawer-toggle inline-drawer-header">
           <b>API 设置</b>
@@ -34,7 +34,7 @@
         </div>
       </div>
 
-      </!-->
+      <!-- TTS模型设置 --></!-->
       <div class="inline-drawer">
         <div class="inline-drawer-toggle inline-drawer-header">
           <b>TTS模型设置</b>
@@ -92,7 +92,7 @@
         </div>
       </div>
 
-      </!-->
+      <!-- 自动朗读设置 --></!-->
       <div class="inline-drawer">
         <div class="inline-drawer-toggle inline-drawer-header">
           <b>自动朗读设置</b>
@@ -116,62 +116,77 @@
 
           <hr style="margin: 15px 0; border-color: #444;" />
 </hr>
-          </!-->
-          <label><b>正则屏蔽设置</b></label>
+          <label><b>📌 文本提取设置</b></label>
           <small style="color: #888; display: block; margin: 5px 0 10px 0;">
-            使用正则表达式过滤不需要朗读的内容，如思考标签、动作描述等
-          </small>
-
-          <label for="regex_filter">屏蔽正则：</label>
-          <input id="regex_filter" type="text" class="text_pole"
-                 placeholder="|\*[^*]+\*"
-                 value="|\*[^*]+\*" /></input>
-          <small style="color: #888; display: block; margin-top: 5px;">
-            常用示例：<br/></br>
-            • <code><think>[\s\S]*?</think></code> - 屏蔽think标签<br/></br>
-            • <code>\*[^*]+\*</code> - 屏蔽星号动作 *动作*<br/></br>
-            • <code>（[^）]+）</code> - 屏蔽中文括号内容<br/></br>
-            • 多个规则用 <code>|</code> 连接
-          </small>
-
-          <div style="margin-top: 15px; padding: 12px; background: rgba(0,0,0,0.2); border-radius: 8px;">
-            <label for="regex_test_text" style="font-size: 0.85em;">测试正则效果：</label>
-            <textarea id="regex_test_text" class="text_pole" rows="2"
-                      placeholder="粘贴测试文本...">「这是对话」*动作描述*</textarea>
-            <button id="test_regex" class="menu_button" style="margin-top: 8px;">
-              <i class="fa-solid fa-vial"></i> 测试屏蔽效果
-            </button>
-            <div id="regex_test_result" style="margin-top: 10px; padding: 10px; background: rgba(0,0,0,0.15); border-radius: 6px; font-size: 0.9em; color: #aaa; min-height: 20px; word-break: break-all;">
-              (结果将显示在这里)
-            </div>
-          </div>
-
-          <hr style="margin: 15px 0; border-color: #444;" />
-</hr>
-          </!-->
-          <label><b>文本截取设置</b></label>
-          <small style="color: #888; display: block; margin: 5px 0;">
-            设置开始和结束标记后，只朗读标记内的文本。<br/></br>
-            <b>支持多组标记</b>：用英文逗号分隔，如 <code>「,"</code> 和 <code>」,"</code>
+            设置开始和结束标记后，只朗读标记内的文本<br/></br>
+            <strong>支持多组标记，用英文逗号 <code>,</code> 分隔</strong><br/></br>
+            例如：开始填 <code>「,（</code>，结束填 <code>」,）</code>
           </small>
           <div style="display: flex; gap: 10px; margin-top: 10px;">
             <div style="flex: 1;">
               <label for="image_text_start">开始标记：</label>
-              <input id="image_text_start" type="text" class="text_pole" placeholder="「,",（" /></input>
+              <input id="image_text_start" type="text" class="text_pole" placeholder="「,（,&quot;" /></input>
             </div>
             <div style="flex: 1;">
               <label for="image_text_end">结束标记：</label>
-              <input id="image_text_end" type="text" class="text_pole" placeholder="」,",）" /></input>
+              <input id="image_text_end" type="text" class="text_pole" placeholder="」,）,&quot;" /></input>
             </div>
           </div>
-          <small style="color: #888; display: block; margin-top: 5px;">
-            示例：开始填 <code>「,"</code>，结束填 <code>」,"</code> 可同时匹配「对话」和"对话"
+
+          <hr style="margin: 20px 0; border-color: #444;" />
+</hr>
+          <!-- 正则屏蔽功能 --></!-->
+          <label><b>🚫 正则屏蔽规则</b></label>
+          <small style="color: #888; display: block; margin: 5px 0 10px 0;">
+            在朗读前移除匹配的内容（如思考过程、分析标签等）
           </small>
+
+          <!-- 预设按钮 --></!-->
+          <div style="display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 15px;">
+            <button id="preset_exclude_think" class="menu_button" style="padding: 6px 12px; font-size: 0.8em;">
+              <i class="fa-solid fa-plus"></i> think
+            </button>
+            <button id="preset_exclude_thinking" class="menu_button" style="padding: 6px 12px; font-size: 0.8em;">
+              <i class="fa-solid fa-plus"></i> thinking
+            </button>
+            <button id="preset_exclude_cot" class="menu_button" style="padding: 6px 12px; font-size: 0.8em;">
+              <i class="fa-solid fa-plus"></i> 小CoT注释
+            </button>
+            <button id="preset_exclude_analysis" class="menu_button" style="padding: 6px 12px; font-size: 0.8em;">
+              <i class="fa-solid fa-plus"></i> analysis
+            </button>
+          </div>
+
+          <!-- 自定义规则输入 --></!-->
+          <div style="background: rgba(0,0,0,0.15); padding: 12px; border-radius: 8px; margin-bottom: 10px;">
+            <label style="font-size: 0.85em;">自定义规则：</label>
+            <div style="display: flex; gap: 8px; margin-top: 8px;">
+              <input id="exclude_pattern_name" type="text" class="text_pole" placeholder="规则名称" style="flex: 1;" /></input>
+              <input id="exclude_pattern_regex" type="text" class="text_pole" placeholder="正则表达式" style="flex: 2;" /></input>
+              <button id="add_exclude_pattern" class="menu_button" style="white-space: nowrap;">
+                <i class="fa-solid fa-plus"></i> 添加
+              </button>
+            </div>
+            <small style="color: #888; display: block; margin-top: 8px;">
+              示例：<code>&lt;mytag&gt;[\s\S]*?&lt;/mytag&gt;</code> 会移除所有 mytag 标签内容
+            </small>
+          </div>
+
+          <!-- 已添加的规则列表 --></!-->
+          <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
+            <label style="font-size: 0.85em; margin: 0;">已添加的规则：</label>
+            <button id="clear_all_patterns" class="menu_button" style="padding: 4px 10px; font-size: 0.75em;">
+              <i class="fa-solid fa-trash"></i> 清空全部
+            </button>
+          </div>
+          <div id="exclude_patterns_list" style="max-height: 200px; overflow-y: auto;">
+            <small style="color: var(--sf-text-secondary);">暂无屏蔽规则，点击上方预设按钮快速添加</small>
+          </div>
 
         </div>
       </div>
 
-      </!-->
+      <!-- 克隆音色功能 --></!-->
       <div class="inline-drawer">
         <div class="inline-drawer-toggle inline-drawer-header">
           <b>克隆音色功能</b>
@@ -210,7 +225,7 @@
         </div>
       </div>
 
-      </!-->
+      <!-- TTS测试 --></!-->
       <div class="inline-drawer">
         <div class="inline-drawer-toggle inline-drawer-header">
           <b>TTS测试</b>
@@ -232,7 +247,7 @@
         </div>
       </div>
 
-      </!-->
+      <!-- 隐藏字段 --></!-->
       <input type="hidden" id="response_format" value="mp3" /></input>
       <input type="hidden" id="sample_rate" value="32000" /></input>
       <input type="hidden" id="image_size" value="512" /></input>
@@ -241,158 +256,3 @@
     </div>
   </div>
 </div>
-
-<style>
-  /* 代码标签样式 */
-  .siliconflow-extension-settings code {
-    background: rgba(124, 58, 237, 0.2);
-    padding: 2px 6px;
-    border-radius: 4px;
-    font-family: 'Consolas', 'Monaco', monospace;
-    font-size: 0.85em;
-    color: #a78bfa;
-  }
-
-  /* 正则测试结果区域 */
-  #regex_test_result {
-    word-break: break-all;
-    white-space: pre-wrap;
-    font-family: 'Consolas', 'Monaco', monospace;
-  }
-
-  #regex_test_result:empty::before {
-    content: '(结果将显示在这里)';
-    color: rgba(255,255,255,0.3);
-    font-style: italic;
-  }
-
-  .siliconflow-extension-settings .inline-drawer {
-    margin-bottom: 5px;
-  }
-
-  .siliconflow-extension-settings .inline-drawer-header {
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    padding: 8px 10px;
-    background: rgba(255, 255, 255, 0.05);
-    border-radius: 4px;
-    cursor: pointer;
-    user-select: none;
-  }
-
-  .siliconflow-extension-settings .inline-drawer-header:hover {
-    background: rgba(255, 255, 255, 0.1);
-  }
-
-  .siliconflow-extension-settings .inline-drawer-icon {
-    transition: transform 0.3s ease;
-  }
-
-  .siliconflow-extension-settings .inline-drawer-icon.down {
-    transform: rotate(180deg);
-  }
-
-  .siliconflow-extension-settings .inline-drawer-content {
-    padding: 15px 10px;
-    border: 1px solid rgba(255, 255, 255, 0.1);
-    border-top: none;
-    border-radius: 0 0 4px 4px;
-  }
-
-  .siliconflow-extension-settings label {
-    display: block;
-    margin-bottom: 5px;
-    font-weight: 500;
-  }
-
-  .siliconflow-extension-settings .text_pole {
-    width: 100%;
-    margin-bottom: 5px;
-  }
-
-  .siliconflow-extension-settings .menu_button {
-    display: inline-flex;
-    align-items: center;
-    gap: 5px;
-    padding: 6px 12px;
-    font-size: 13px;
-  }
-
-  .siliconflow-extension-settings .menu_button i {
-    font-size: 12px;
-  }
-
-  .siliconflow-extension-settings .checkbox_label {
-    display: flex;
-    align-items: center;
-    gap: 8px;
-    cursor: pointer;
-  }
-
-  .siliconflow-extension-settings .checkbox_label input[type="checkbox"] {
-    width: 16px;
-    height: 16px;
-    cursor: pointer;
-  }
-
-  .siliconflow-extension-settings hr {
-    border: none;
-    border-top: 1px solid rgba(255, 255, 255, 0.1);
-  }
-
-  .siliconflow-extension-settings .custom-voice-item {
-    background: rgba(255, 255, 255, 0.03);
-    transition: background 0.2s;
-  }
-
-  .siliconflow-extension-settings .custom-voice-item:hover {
-    background: rgba(255, 255, 255, 0.08);
-  }
-
-  .siliconflow-extension-settings input[type="range"] {
-    -webkit-appearance: none;
-    width: 100%;
-    height: 6px;
-    background: rgba(255, 255, 255, 0.2);
-    border-radius: 3px;
-    outline: none;
-  }
-
-  .siliconflow-extension-settings input[type="range"]::-webkit-slider-thumb {
-    -webkit-appearance: none;
-    width: 16px;
-    height: 16px;
-    background: #4a9eff;
-    border-radius: 50%;
-    cursor: pointer;
-  }
-
-  .siliconflow-extension-settings input[type="range"]::-moz-range-thumb {
-    width: 16px;
-    height: 16px;
-    background: #4a9eff;
-    border-radius: 50%;
-    cursor: pointer;
-    border: none;
-  }
-
-  .siliconflow-extension-settings select optgroup {
-    font-weight: bold;
-    font-style: normal;
-  }
-
-  .siliconflow-extension-settings #tts_output a {
-    display: inline-block;
-    padding: 8px 15px;
-    background: #4a9eff;
-    color: white;
-    text-decoration: none;
-    border-radius: 4px;
-    font-size: 13px;
-  }
-
-  .siliconflow-extension-settings #tts_output a:hover {
-    background: #3a8eef;
-  }
-</style>
