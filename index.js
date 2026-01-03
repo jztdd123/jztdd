@@ -3,63 +3,48 @@ import { extension_settings, saveSettingsDebounced, eventSource, event_types } f
 const extensionName = "jztdd";
 const extensionFolderPath = `scripts/extensions/third-party/${extensionName}`;
 
-const audioState = {
-    isPlaying: false,
-    audioInstance: null
-};
-
+// 默认设置
 const defaultSettings = {
     apiKey: "",
     apiUrl: "https://api.siliconflow.cn/v1",
     ttsModel: "FunAudioLLM/CosyVoice2-0.5B",
-    cachedModels: ["FunAudioLLM/CosyVoice2-0.5B", "deepseek-ai/DeepSeek-V3"],
+    cachedModels: ["FunAudioLLM/CosyVoice2-0.5B"],
     ttsVoice: "alex",
     ttsSpeed: 1.0,
     ttsGain: 0,
     textStart: "",
     textEnd: "",
     autoPlay: true,
-    autoPlayUser: false,
-    customVoices: []
+    autoPlayUser: false
 };
 
-const COMMON_VOICES = {
-    "alex": "Alex (CosyVoice)",
-    "anna": "Anna (CosyVoice)",
-    "bella": "Bella (CosyVoice)",
-    "benjamin": "Benjamin (CosyVoice)",
-    "charles": "Charles (CosyVoice)",
-    "claire": "Claire (CosyVoice)",
-    "david": "David (CosyVoice)",
-    "diana": "Diana (CosyVoice)"
-};
+// 内部状态
+let isPlaying = false;
+let audioInstance = null;
 
-// --- 状态指示器 ---
+// 状态提示窗逻辑
 function showStatus(msg, persistent = false) {
     let $indicator = $('#tts_status_indicator');
     if ($indicator.length === 0) {
-        $indicator = $('<div id="tts_status_indicator"><div class="sf-pulse"></div><span class="status-text"></span></div>');
+        $indicator = $('<div id="tts_status_indicator" style="position:fixed;top:20px;right:20px;z-index:10000;padding:10px 20px;border-radius:10px;background:rgba(0,0,0,0.8);color:white;display:flex;align-items:center;gap:10px;border:1px solid #6366f1;box-shadow:0 4px 15px rgba(0,0,0,0.5);"><div class="sf-pulse" style="width:10px;height:10px;background:#6366f1;border-radius:50%;"></div><span class="status-text"></span></div>');
         $('body').append($indicator);
     }
     $indicator.find('.status-text').text(msg);
-    $indicator.css('display', 'flex').fadeIn(200);
+    $indicator.stop(true, true).fadeIn(200);
     if (!persistent) setTimeout(() => $indicator.fadeOut(500), 3000);
 }
 
-function hideStatus() {
-    $('#tts_status_indicator').fadeOut(500);
-}
+// 文本提取逻辑
+function extractText(text) {
+    const sMarkers = extension_settings[extensionName].textStart;
+    const eMarkers = extension_settings[extensionName].textEnd;
+    if (!sMarkers || !eMarkers) return text;
 
-// --- 核心：文本提取 ---
-function extractText(text, startMarkers, endMarkers) {
-    if (!startMarkers || !endMarkers) return text;
-    const starts = startMarkers.split(/[,，]/).map(s => s.trim()).filter(s => s);
-    const ends = endMarkers.split(/[,，]/).map(s => s.trim()).filter(s => s);
-    if (starts.length === 0 || ends.length === 0) return text;
-
+    const starts = sMarkers.split(/[,，]/).map(s => s.trim()).filter(s => s);
+    const ends = eMarkers.split(/[,，]/).map(s => s.trim()).filter(s => s);
+    
     let parts = [];
-    const minLen = Math.min(starts.length, ends.length);
-    for (let i = 0; i < minLen; i++) {
+    for (let i = 0; i < Math.min(starts.length, ends.length); i++) {
         const s = starts[i].replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
         const e = ends[i].replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
         const regex = new RegExp(`${s}(.*?)${e}`, 'g');
@@ -69,24 +54,19 @@ function extractText(text, startMarkers, endMarkers) {
     return parts.length > 0 ? parts.join(' ') : text;
 }
 
-// --- 核心：生成与播放 ---
+// TTS 生成函数
 async function generateTTS(text) {
     if (!text || text.trim().length === 0) return;
     const settings = extension_settings[extensionName];
-    
+    if (!settings.apiKey) return toastr.warning("请先配置 SiliconFlow API Key");
+
     try {
-        showStatus("正在合成语音...", true);
-        
-        const voiceParam = settings.ttsVoice.includes("/") || settings.ttsVoice.includes(":") 
-            ? settings.ttsVoice 
-            : `${settings.ttsModel}:${settings.ttsVoice}`;
+        showStatus("合成中...", true);
+        const voiceParam = settings.ttsVoice.includes(":") ? settings.ttsVoice : `${settings.ttsModel}:${settings.ttsVoice}`;
 
         const response = await fetch(`${settings.apiUrl}/audio/speech`, {
             method: 'POST',
-            headers: {
-                'Authorization': `Bearer ${settings.apiKey}`,
-                'Content-Type': 'application/json'
-            },
+            headers: { 'Authorization': `Bearer ${settings.apiKey}`, 'Content-Type': 'application/json' },
             body: JSON.stringify({
                 model: settings.ttsModel,
                 input: text,
@@ -97,62 +77,24 @@ async function generateTTS(text) {
             })
         });
 
-        if (!response.ok) throw new Error(`API错误: ${response.status}`);
+        if (!response.ok) throw new Error(`HTTP ${response.status}`);
 
         const blob = await response.blob();
-        const url = URL.createObjectURL(blob);
+        if (audioInstance) audioInstance.pause();
         
-        if (audioState.audioInstance) audioState.audioInstance.pause();
-        
-        const audio = new Audio(url);
-        audioState.audioInstance = audio;
-        
-        audio.onplay = () => {
-            audioState.isPlaying = true;
-            showStatus("正在朗读...");
-        };
-        audio.onended = () => {
-            audioState.isPlaying = false;
-            hideStatus();
-            URL.revokeObjectURL(url);
-        };
-        
-        await audio.play();
-        $("#tts_output").html(`<a href="${url}" download="tts.mp3" style="color:var(--sf-primary); font-size:0.8em;">下载最近一次语音</a>`);
-
+        audioInstance = new Audio(URL.createObjectURL(blob));
+        audioInstance.onplay = () => showStatus("正在播放...");
+        audioInstance.onended = () => $('#tts_status_indicator').fadeOut(500);
+        await audioInstance.play();
     } catch (e) {
-        console.error("TTS Error:", e);
-        toastr.error(e.message, "语音合成失败");
-        hideStatus();
+        console.error("TTS失败:", e);
+        toastr.error("语音合成出错");
+        $('#tts_status_indicator').hide();
     }
 }
 
-// --- 消息监听器优化 ---
-function setupListeners() {
-    // 关键改变：监听流传输完成事件
-    eventSource.on(event_types.STREAM_FINISHED, async (messageId) => {
-        if (!extension_settings[extensionName].autoPlay) return;
-        
-        // 稍微延迟确保 DOM 加载完毕
-        setTimeout(() => {
-            const $mes = $(`.mes[mesid="${messageId}"]`);
-            if ($mes.find('.ch_name').length > 0 || $mes.hasClass('last_mes')) {
-                const rawText = $mes.find('.mes_text').text();
-                const cleanText = extractText(rawText, extension_settings[extensionName].textStart, extension_settings[extensionName].textEnd);
-                generateTTS(cleanText);
-            }
-        }, 300);
-    });
-
-    eventSource.on(event_types.USER_MESSAGE_RENDERED, (messageId) => {
-        if (!extension_settings[extensionName].autoPlayUser) return;
-        const text = $(`.mes[mesid="${messageId}"] .mes_text`).text();
-        generateTTS(text);
-    });
-}
-
-// --- 初始化与 UI 绑定 ---
-async function loadSettings() {
+// 初始化设置
+function initSettings() {
     extension_settings[extensionName] = { ...defaultSettings, ...extension_settings[extensionName] };
     const s = extension_settings[extensionName];
 
@@ -163,79 +105,67 @@ async function loadSettings() {
     $("#auto_play_audio").prop("checked", s.autoPlay);
     $("#auto_play_user").prop("checked", s.autoPlayUser);
     $("#tts_speed").val(s.ttsSpeed);
-    $("#tts_speed_value").text(s.ttsSpeed);
     $("#tts_gain").val(s.ttsGain);
-    $("#tts_gain_value").text(s.ttsGain);
 
-    updateModelSelect(s.cachedModels, s.ttsModel);
-    updateVoiceOptions(s.ttsVoice);
-}
-
-function updateModelSelect(models, current) {
+    // 填充模型下拉
     const $m = $("#tts_model").empty();
-    models.forEach(m => $m.append(new Option(m, m)));
-    $m.val(current || models[0]);
-}
+    s.cachedModels.forEach(m => $m.append(new Option(m, m)));
+    $m.val(s.ttsModel);
 
-function updateVoiceOptions(current) {
+    // 填充音色下拉
     const $v = $("#tts_voice").empty();
-    const group = $('<optgroup label="预设音色"></optgroup>');
-    Object.entries(COMMON_VOICES).forEach(([k, v]) => group.append(new Option(v, k)));
-    $v.append(group);
-    
-    const custom = extension_settings[extensionName].customVoices || [];
-    if (custom.length > 0) {
-        const cg = $('<optgroup label="自定义音色"></optgroup>');
-        custom.forEach(cv => cg.append(new Option(cv.name || cv.customName, cv.uri)));
-        $v.append(cg);
-    }
-    $v.val(current || "alex");
+    ["alex", "anna", "bella", "benjamin", "charles", "claire", "david", "diana"].forEach(v => $v.append(new Option(v, v)));
+    $v.val(s.ttsVoice);
 }
 
+// 插件入口
 $(async () => {
-    const html = await $.get(`${extensionFolderPath}/example.html`);
-    $("#extensions_settings").append(html);
+    try {
+        // 加载 HTML
+        const html = await $.get(`${extensionFolderPath}/example.html`);
+        if (!html) throw new Error("无法加载 HTML 文件");
+        
+        // 确保挂载到酒馆扩展设置面板
+        $("#extensions_settings").append(html);
 
-    $(document).on('click', '.inline-drawer-toggle', function() {
-        $(this).next().slideToggle(200);
-        $(this).find('.inline-drawer-icon').toggleClass('fa-chevron-down fa-chevron-up');
-    });
+        // 绑定事件
+        $(document).on('click', '#save_siliconflow_settings', () => {
+            const s = extension_settings[extensionName];
+            s.apiKey = $("#siliconflow_api_key").val();
+            s.apiUrl = $("#siliconflow_api_url").val();
+            s.ttsModel = $("#tts_model").val();
+            s.ttsVoice = $("#tts_voice").val();
+            s.textStart = $("#image_text_start").val();
+            s.textEnd = $("#image_text_end").val();
+            s.autoPlay = $("#auto_play_audio").prop("checked");
+            s.autoPlayUser = $("#auto_play_user").prop("checked");
+            s.ttsSpeed = parseFloat($("#tts_speed").val());
+            s.ttsGain = parseFloat($("#tts_gain").val());
+            saveSettingsDebounced();
+            toastr.success("配置已保存");
+        });
 
-    $("#save_siliconflow_settings").on("click", () => {
-        const s = extension_settings[extensionName];
-        s.apiKey = $("#siliconflow_api_key").val();
-        s.apiUrl = $("#siliconflow_api_url").val();
-        s.ttsModel = $("#tts_model").val();
-        s.ttsVoice = $("#tts_voice").val();
-        s.textStart = $("#image_text_start").val();
-        s.textEnd = $("#image_text_end").val();
-        s.autoPlay = $("#auto_play_audio").prop("checked");
-        s.autoPlayUser = $("#auto_play_user").prop("checked");
-        s.ttsSpeed = parseFloat($("#tts_speed").val());
-        s.ttsGain = parseFloat($("#tts_gain").val());
-        saveSettingsDebounced();
-        toastr.success("设置已保存");
-    });
+        $(document).on('click', '#test_tts', () => {
+            const txt = $("#tts_test_text").val();
+            generateTTS(txt);
+        });
 
-    $("#tts_speed").on("input", function() { $("#tts_speed_value").text($(this).val()); });
-    $("#tts_gain").on("input", function() { $("#tts_gain_value").text($(this).val()); });
+        // 消息监听
+        eventSource.on(event_types.STREAM_FINISHED, (messageId) => {
+            if (!extension_settings[extensionName].autoPlay) return;
+            setTimeout(() => {
+                const $mes = $(`.mes[mesid="${messageId}"]`);
+                if ($mes.find('.ch_name').length > 0 || $mes.hasClass('last_mes')) {
+                    const cleanText = extractText($mes.find('.mes_text').text());
+                    generateTTS(cleanText);
+                }
+            }, 500);
+        });
 
-    $("#test_tts").on("click", () => generateTTS($("#tts_test_text").val()));
+        initSettings();
+        console.log("SiliconFlow 插件加载成功");
 
-    $("#test_siliconflow_connection").on("click", async () => {
-        try {
-            const res = await fetch(`${$("#siliconflow_api_url").val()}/models`, {
-                headers: { 'Authorization': `Bearer ${$("#siliconflow_api_key").val()}` }
-            });
-            if (res.ok) {
-                $("#connection_status").text("已连接").css("color", "#4ade80");
-                toastr.success("连接成功");
-            } else throw new Error();
-        } catch {
-            $("#connection_status").text("连接失败").css("color", "#ff4d4d");
-        }
-    });
-
-    await loadSettings();
-    setupListeners();
+    } catch (err) {
+        console.error("SiliconFlow 插件启动失败:", err);
+    }
 });
