@@ -1,0 +1,12 @@
+{
+    "display_name": "硅基流动语音插件",
+    "loading_order": 1,
+    "requires": [],
+    "optional": [],
+    "js": "index.js",
+    "css": "style.css",
+    "author": "沐风的狗子",
+    "version": "1.0.0",
+    "homePage": "yourUrlHere"
+}
+
