@@ -2,7 +2,7 @@ import { extension_settings, getContext, loadExtensionSettings } from "../../../
 import { saveSettingsDebounced, eventSource, event_types } from "../../../../script.js";
 
 // 扩展配置
-const extensionName = "extension";
+const extensionName = "jztdd"; // <--- 这里必须是你的文件夹名字
 const extensionFolderPath = `scripts/extensions/third-party/${extensionName}`;
 
 // 全局状态管理
@@ -19,6 +19,7 @@ const defaultSettings = {
   apiKey: "",
   apiUrl: "https://api.siliconflow.cn/v1",
   ttsModel: "FunAudioLLM/CosyVoice2-0.5B",
+  // ...后面的代码请确保也是英文关键词...
   cachedModels: [], // 新增：缓存的模型列表
   ttsVoice: "alex",
   ttsSpeed: 1.0,
@@ -443,3 +444,4 @@ jQuery(async () => {
 });
 
 export { generateTTS };
+
