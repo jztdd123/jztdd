@@ -1,12 +1,13 @@
 {
-    "display_name": "硅基流动语音插件",
+    "display_name": "痔疮秘制硅基TTS",
     "loading_order": 1,
     "requires": [],
     "optional": [],
     "js": "index.js",
     "css": "style.css",
-    "author": "沐风的狗子",
-    "version": "1.0.0",
+    "author": "痔疮爆裂少年",
+    "version": "114.5.14",
     "homePage": "yourUrlHere"
 }
+
 
