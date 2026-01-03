@@ -26,24 +26,14 @@ const defaultSettings = {
   sampleRate: 32000,
   imageModel: "",
   imageSize: "512",
-  textStart: "",
-  textEnd: "",
+  textStart: "「",
+  textEnd: "」",
   generationFrequency: 5,
   autoPlay: true,
   autoPlayUser: false,
   customVoices: [],
   availableModels: [],
-  // 新增：正则屏蔽规则
-  excludePatterns: [],
-  // 预设的屏蔽规则
-  presetExcludes: {
-    think: "",
-    thinking: "<thinking>[\\s\\S]*?",</thinking>
-    analysis: "<analysis>[\\s\\S]*?</analysis>",
-    note: "<note>[\\s\\S]*?</note>",
-    cot: "<!--[\\s\\S]*?-->",</!--[\\s\\S]*?-->
-    system: "<system>[\\s\\S]*?</system>"
-  }
+  filterRules: [] // 新增：正则屏蔽规则
 };
 
 // TTS模型和音色配置
@@ -62,6 +52,185 @@ const TTS_MODELS = {
     }
   }
 };
+
+// ==================== 正则屏蔽功能 ====================
+
+// 应用屏蔽规则过滤文本
+function applyFilterRules(text) {
+  const rules = extension_settings[extensionName].filterRules || [];
+  let filteredText = text;
+
+  rules.forEach(rule => {
+    if (rule.enabled && rule.pattern) {
+      try {
+        const regex = new RegExp(rule.pattern, 'gi');
+        filteredText = filteredText.replace(regex, '');
+      } catch (e) {
+        console.error(`正则规则 "${rule.name}" 无效:`, e);
+      }
+    }
+  });
+
+  // 清理多余空白
+  filteredText = filteredText.replace(/\s+/g, ' ').trim();
+  return filteredText;
+}
+
+// 添加屏蔽规则
+function addFilterRule(name, pattern) {
+  if (!name || !pattern) {
+    toastr.error("请填写规则名称和正则表达式", "添加失败");
+    return false;
+  }
+
+  // 验证正则表达式
+  try {
+    new RegExp(pattern);
+  } catch (e) {
+    toastr.error(`正则表达式无效: ${e.message}`, "添加失败");
+    return false;
+  }
+
+  const rules = extension_settings[extensionName].filterRules || [];
+
+  // 检查是否已存在
+  if (rules.some(r => r.name === name)) {
+    toastr.warning(`规则 "${name}" 已存在`, "添加失败");
+    return false;
+  }
+
+  rules.push({
+    name: name,
+    pattern: pattern,
+    enabled: true
+  });
+
+  extension_settings[extensionName].filterRules = rules;
+  saveSettingsDebounced();
+  updateFilterRulesList();
+  toastr.success(`规则 "${name}" 已添加`, "添加成功");
+  return true;
+}
+
+// 删除屏蔽规则
+function removeFilterRule(name) {
+  const rules = extension_settings[extensionName].filterRules || [];
+  extension_settings[extensionName].filterRules = rules.filter(r => r.name !== name);
+  saveSettingsDebounced();
+  updateFilterRulesList();
+}
+
+// 切换规则启用状态
+function toggleFilterRule(name) {
+  const rules = extension_settings[extensionName].filterRules || [];
+  const rule = rules.find(r => r.name === name);
+  if (rule) {
+    rule.enabled = !rule.enabled;
+    saveSettingsDebounced();
+    updateFilterRulesList();
+  }
+}
+
+// 更新屏蔽规则列表UI
+function updateFilterRulesList() {
+  const rules = extension_settings[extensionName].filterRules || [];
+  const container = $("#filter_rules_list");
+
+  if (rules.length === 0) {
+    container.html("<small>暂无屏蔽规则</small>");
+    return;
+  }
+
+  let html = "";
+  rules.forEach(rule => {
+    const statusClass = rule.enabled ? "enabled" : "disabled";
+    const statusIcon = rule.enabled ? "fa-toggle-on" : "fa-toggle-off";
+    const statusColor = rule.enabled ? "#10b981" : "#6b7280";
+
+    html += `
+      <div class="filter-rule-item" style="display: flex; align-items: center; gap: 10px; padding: 10px; margin-bottom: 8px; background: rgba(0,0,0,0.2); border-radius: 8px; border: 1px solid rgba(255,255,255,0.1);">
+        <button class="menu_button toggle-rule-btn" data-name="${rule.name}" style="padding: 5px 10px; background: transparent !important; box-shadow: none !important;">
+          <i class="fa-solid ${statusIcon}" style="color: ${statusColor}; font-size: 1.2em;"></i>
+        </button>
+        <div style="flex: 1; overflow: hidden;">
+          <div style="font-weight: 600; color: ${rule.enabled ? '#fff' : '#888'};">${rule.name}</div>
+          <div style="font-size: 0.8em; color: #888; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;" title="${rule.pattern}">
+            <code>${rule.pattern}</code>
+          </div>
+        </div>
+        <button class="menu_button delete-rule-btn" data-name="${rule.name}" style="padding: 5px 10px; background: rgba(239,68,68,0.2) !important;">
+          <i class="fa-solid fa-trash" style="color: #ef4444;"></i>
+        </button>
+      </div>
+    `;
+  });
+
+  container.html(html);
+}
+
+// ==================== 多标记提取功能 ====================
+
+// 解析多个标记（用逗号分隔）
+function parseMarkers(markerString) {
+  if (!markerString) return [];
+  return markerString.split(',').map(m => m.trim()).filter(m => m.length > 0);
+}
+
+// 使用多组标记提取文本
+function extractTextWithMultipleMarkers(message, startMarkers, endMarkers) {
+  let extractedTexts = [];
+
+  // 如果开始和结束标记数量不匹配，使用最小数量
+  const pairCount = Math.min(startMarkers.length, endMarkers.length);
+
+  for (let i = 0; i < pairCount; i++) {
+    const startMark = startMarkers[i];
+    const endMark = endMarkers[i];
+
+    if (startMark === endMark) {
+      // 相同标记的配对提取
+      let insideQuote = false;
+      let currentText = '';
+
+      for (let j = 0; j < message.length; j++) {
+        const char = message[j];
+
+        if (char === startMark) {
+          if (!insideQuote) {
+            insideQuote = true;
+            currentText = '';
+          } else {
+            if (currentText.trim()) {
+              extractedTexts.push(currentText.trim());
+            }
+            insideQuote = false;
+            currentText = '';
+          }
+        } else if (insideQuote) {
+          currentText += char;
+        }
+      }
+    } else {
+      // 不同标记的正则提取
+      const escapeRegex = (str) => str.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+      const escapedStart = escapeRegex(startMark);
+      const escapedEnd = escapeRegex(endMark);
+
+      const regex = new RegExp(`${escapedStart}([\\s\\S]*?)${escapedEnd}`, 'g');
+      let match;
+
+      while ((match = regex.exec(message)) !== null) {
+        if (match[1] && match[1].trim()) {
+          extractedTexts.push(match[1].trim());
+        }
+      }
+    }
+  }
+
+  return extractedTexts;
+}
+
+// ==================== API功能 ====================
 
 // 从API获取可用模型
 async function fetchAvailableModels() {
@@ -118,7 +287,6 @@ function updateModelDropdown(models) {
   const currentValue = modelSelect.val();
 
   modelSelect.empty();
-
   modelSelect.append('<optgroup label="默认模型">');
   modelSelect.append('<option value="FunAudioLLM/CosyVoice2-0.5B">CosyVoice2-0.5B (默认)</option>');
   modelSelect.append('</optgroup>');
@@ -208,70 +376,8 @@ async function testCurrentModel() {
   }
 }
 
-// 获取模型支持的音色
-async function fetchModelVoices() {
-  const apiKey = $("#siliconflow_api_key").val();
-  const apiUrl = $("#siliconflow_api_url").val();
-  const model = $("#tts_model").val();
+// ==================== 设置管理 ====================
 
-  if (!apiKey) return;
-
-  try {
-    const response = await fetch(`${apiUrl}/models/${encodeURIComponent(model)}`, {
-      method: 'GET',
-      headers: {
-        'Authorization': `Bearer ${apiKey}`
-      }
-    });
-
-    if (response.ok) {
-      const data = await response.json();
-      console.log("模型详情:", data);
-
-      if (data.voices || data.supported_voices) {
-        const voices = data.voices || data.supported_voices;
-        updateVoiceOptionsFromAPI(voices);
-      }
-    }
-  } catch (error) {
-    console.log("获取模型音色列表失败，使用默认音色");
-  }
-}
-
-// 从API响应更新音色选项
-function updateVoiceOptionsFromAPI(voices) {
-  const voiceSelect = $("#tts_voice");
-  const currentValue = voiceSelect.val();
-
-  voiceSelect.empty();
-
-  if (Array.isArray(voices)) {
-    voiceSelect.append('<optgroup label="模型支持的音色">');
-    voices.forEach(voice => {
-      const voiceId = voice.id || voice.name || voice;
-      const voiceName = voice.displayName || voice.name || voice.id || voice;
-      voiceSelect.append(`<option value="${voiceId}">${voiceName}</option>`);
-    });
-    voiceSelect.append('</optgroup>');
-  }
-
-  const customVoices = extension_settings[extensionName].customVoices || [];
-  if (customVoices.length > 0) {
-    voiceSelect.append('<optgroup label="自定义音色">');
-    customVoices.forEach(voice => {
-      const voiceName = voice.name || voice.customName || "未命名";
-      const voiceUri = voice.uri || voice.id;
-      voiceSelect.append(`<option value="${voiceUri}">${voiceName} (自定义)</option>`);
-    });
-    voiceSelect.append('</optgroup>');
-  }
-
-  if (currentValue && voiceSelect.find(`option[value="${currentValue}"]`).length > 0) {
-    voiceSelect.val(currentValue);
-  }
-}
-
-// 加载设置
 async function loadSettings() {
   extension_settings[extensionName] = extension_settings[extensionName] || {};
 
@@ -279,9 +385,9 @@ async function loadSettings() {
     Object.assign(extension_settings[extensionName], defaultSettings);
   }
 
-  // 确保新字段存在
-  if (!extension_settings[extensionName].excludePatterns) {
-    extension_settings[extensionName].excludePatterns = [];
+  // 确保filterRules存在
+  if (!extension_settings[extensionName].filterRules) {
+    extension_settings[extensionName].filterRules = [];
   }
 
   // 更新UI
@@ -293,12 +399,8 @@ async function loadSettings() {
   $("#tts_speed_value").text(extension_settings[extensionName].ttsSpeed || defaultSettings.ttsSpeed);
   $("#tts_gain").val(extension_settings[extensionName].ttsGain || defaultSettings.ttsGain);
   $("#tts_gain_value").text(extension_settings[extensionName].ttsGain || defaultSettings.ttsGain);
-  $("#response_format").val(extension_settings[extensionName].responseFormat || defaultSettings.responseFormat);
-  $("#sample_rate").val(extension_settings[extensionName].sampleRate || defaultSettings.sampleRate);
-  $("#image_size").val(extension_settings[extensionName].imageSize || defaultSettings.imageSize);
   $("#image_text_start").val(extension_settings[extensionName].textStart || defaultSettings.textStart);
   $("#image_text_end").val(extension_settings[extensionName].textEnd || defaultSettings.textEnd);
-  $("#generation_frequency").val(extension_settings[extensionName].generationFrequency || defaultSettings.generationFrequency);
   $("#auto_play_audio").prop("checked", extension_settings[extensionName].autoPlay !== false);
   $("#auto_play_user").prop("checked", extension_settings[extensionName].autoPlayUser === true);
 
@@ -307,10 +409,9 @@ async function loadSettings() {
   }
 
   updateVoiceOptions();
-  updateExcludePatternsList();
+  updateFilterRulesList();
 }
 
-// 更新音色选项
 function updateVoiceOptions() {
   const model = $("#tts_model").val();
   const voiceSelect = $("#tts_voice");
@@ -333,14 +434,11 @@ function updateVoiceOptions() {
   }
 
   const customVoices = extension_settings[extensionName].customVoices || [];
-  console.log(`更新音色选项，自定义音色数量: ${customVoices.length}`);
-
   if (customVoices.length > 0) {
     voiceSelect.append('<optgroup label="自定义音色">');
     customVoices.forEach(voice => {
       const voiceName = voice.name || voice.customName || voice.custom_name || "未命名";
       const voiceUri = voice.uri || voice.id || voice.voice_id;
-      console.log(`添加自定义音色: ${voiceName} -> ${voiceUri}`);
       voiceSelect.append(`<option value="${voiceUri}">${voiceName} (自定义)</option>`);
     });
     voiceSelect.append('</optgroup>');
@@ -349,11 +447,10 @@ function updateVoiceOptions() {
   if (currentValue && voiceSelect.find(`option[value="${currentValue}"]`).length > 0) {
     voiceSelect.val(currentValue);
   } else {
-    voiceSelect.val(extension_settings[extensionName].ttsVoice || Object.keys(TTS_MODELS[model]?.voices || {})[0] || "alex");
+    voiceSelect.val(extension_settings[extensionName].ttsVoice || "alex");
   }
 }
 
-// 保存设置
 function saveSettings() {
   extension_settings[extensionName].apiKey = $("#siliconflow_api_key").val();
   extension_settings[extensionName].apiUrl = $("#siliconflow_api_url").val();
@@ -361,12 +458,8 @@ function saveSettings() {
   extension_settings[extensionName].ttsVoice = $("#tts_voice").val();
   extension_settings[extensionName].ttsSpeed = parseFloat($("#tts_speed").val());
   extension_settings[extensionName].ttsGain = parseFloat($("#tts_gain").val());
-  extension_settings[extensionName].responseFormat = $("#response_format").val();
-  extension_settings[extensionName].sampleRate = parseInt($("#sample_rate").val());
-  extension_settings[extensionName].imageSize = $("#image_size").val();
   extension_settings[extensionName].textStart = $("#image_text_start").val();
   extension_settings[extensionName].textEnd = $("#image_text_end").val();
-  extension_settings[extensionName].generationFrequency = parseInt($("#generation_frequency").val());
   extension_settings[extensionName].autoPlay = $("#auto_play_audio").prop("checked");
   extension_settings[extensionName].autoPlayUser = $("#auto_play_user").prop("checked");
 
@@ -374,7 +467,8 @@ function saveSettings() {
   console.log("设置已保存");
 }
 
-// 测试连接
+// ==================== 连接测试 ====================
+
 async function testConnection() {
   const apiKey = $("#siliconflow_api_key").val();
   const apiUrl = $("#siliconflow_api_url").val();
@@ -385,7 +479,7 @@ async function testConnection() {
   }
 
   try {
-    $("#test_siliconflow_connection").prop("disabled", true).text("测试中...");
+    $("#test_siliconflow_connection").prop("disabled", true).html('<i class="fa-solid fa-spinner fa-spin"></i> 测试中...');
 
     const response = await fetch(`${apiUrl}/audio/voice/list`, {
       method: 'GET',
@@ -398,7 +492,6 @@ async function testConnection() {
     if (response.ok) {
       $("#connection_status").text("已连接").css("color", "green");
       toastr.success("API连接成功", "连接测试");
-      console.log("API连接成功");
     } else {
       throw new Error(`HTTP ${response.status}`);
     }
@@ -406,245 +499,8 @@ async function testConnection() {
     toastr.error(`连接失败: ${error.message}`, "硅基流动插件");
     $("#connection_status").text("未连接").css("color", "red");
   } finally {
-    $("#test_siliconflow_connection").prop("disabled", false).text("测试连接");
+    $("#test_siliconflow_connection").prop("disabled", false).html('<i class="fa-solid fa-plug"></i> 测试连接');
   }
-}
-
-// ==================== 新增：文本处理函数 ====================
-
-/**
- * 应用正则屏蔽规则，从文本中移除匹配的内容
- * @param {string} text - 原始文本
- * @returns {string} - 处理后的文本
- */
-function applyExcludePatterns(text) {
-  const patterns = extension_settings[extensionName].excludePatterns || [];
-
-  if (patterns.length === 0) {
-    return text;
-  }
-
-  let result = text;
-
-  patterns.forEach(pattern => {
-    try {
-      const regex = new RegExp(pattern.regex, 'gi');
-      const before = result;
-      result = result.replace(regex, '');
-      if (before !== result) {
-        console.log(`正则屏蔽规则 "${pattern.name}" 已应用`);
-      }
-    } catch (e) {
-      console.error(`正则表达式错误 (${pattern.name}):`, e);
-    }
-  });
-
-  // 清理多余的空行
-  result = result.replace(/\n{3,}/g, '\n\n').trim();
-
-  return result;
-}
-
-/**
- * 从文本中提取标记内的内容（支持多组标记，用逗号分隔）
- * @param {string} text - 原始文本
- * @param {string} startMarkers - 开始标记（多个用逗号分隔）
- * @param {string} endMarkers - 结束标记（多个用逗号分隔）
- * @returns {string} - 提取的文本
- */
-function extractMarkedText(text, startMarkers, endMarkers) {
-  if (!startMarkers || !endMarkers) {
-    return text;
-  }
-
-  // 分割多个标记
-  const starts = startMarkers.split(',').map(s => s.trim()).filter(s => s);
-  const ends = endMarkers.split(',').map(s => s.trim()).filter(s => s);
-
-  // 如果数量不匹配，取最小数量
-  const pairCount = Math.min(starts.length, ends.length);
-
-  if (pairCount === 0) {
-    return text;
-  }
-
-  let extractedTexts = [];
-
-  for (let i = 0; i < pairCount; i++) {
-    const textStart = starts[i];
-    const textEnd = ends[i];
-
-    console.log(`处理标记对 ${i + 1}: "${textStart}" ... "${textEnd}"`);
-
-    if (textStart === textEnd) {
-      // 相同标记：配对算法
-      let insideQuote = false;
-      let currentText = '';
-
-      for (let j = 0; j < text.length; j++) {
-        // 检查是否匹配标记（支持多字符标记）
-        const matchStart = text.substring(j, j + textStart.length) === textStart;
-
-        if (matchStart) {
-          if (!insideQuote) {
-            insideQuote = true;
-            currentText = '';
-            j += textStart.length - 1; // 跳过标记字符
-          } else {
-            if (currentText.trim()) {
-              extractedTexts.push(currentText.trim());
-            }
-            insideQuote = false;
-            currentText = '';
-            j += textEnd.length - 1;
-          }
-        } else if (insideQuote) {
-          currentText += text[j];
-        }
-      }
-    } else {
-      // 不同标记：使用正则表达式
-      const escapeRegex = (str) => str.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-      const escapedStart = escapeRegex(textStart);
-      const escapedEnd = escapeRegex(textEnd);
-
-      const regex = new RegExp(`${escapedStart}([\\s\\S]*?)${escapedEnd}`, 'g');
-      let match;
-
-      while ((match = regex.exec(text)) !== null) {
-        if (match[1] && match[1].trim()) {
-          extractedTexts.push(match[1].trim());
-        }
-      }
-    }
-  }
-
-  if (extractedTexts.length > 0) {
-    return extractedTexts.join(' ');
-  }
-
-  // 没有找到匹配内容
-  console.log('未找到标记匹配内容');
-  return '';
-}
-
-/**
- * 完整的文本处理流程
- * @param {string} text - 原始文本
- * @returns {string} - 处理后的文本
- */
-function processTextForTTS(text) {
-  console.log('=== 开始文本处理 ===');
-  console.log('原始文本长度:', text.length);
-
-  // 步骤1：应用正则屏蔽规则
-  let processedText = applyExcludePatterns(text);
-  console.log('屏蔽后文本长度:', processedText.length);
-
-  // 步骤2：提取标记内容
-  const textStart = $("#image_text_start").val();
-  const textEnd = $("#image_text_end").val();
-
-  if (textStart && textEnd) {
-    const extracted = extractMarkedText(processedText, textStart, textEnd);
-    if (extracted) {
-      processedText = extracted;
-      console.log('提取后文本长度:', processedText.length);
-    } else {
-      console.log('标记提取无结果，跳过朗读');
-      return '';
-    }
-  }
-
-  console.log('=== 文本处理完成 ===');
-  return processedText;
-}
-
-// ==================== 正则屏蔽规则管理 ====================
-
-/**
- * 添加屏蔽规则
- */
-function addExcludePattern(name, regex) {
-  if (!name || !regex) {
-    toastr.error("名称和正则表达式不能为空", "添加失败");
-    return false;
-  }
-
-  // 验证正则表达式
-  try {
-    new RegExp(regex);
-  } catch (e) {
-    toastr.error(`正则表达式无效: ${e.message}`, "添加失败");
-    return false;
-  }
-
-  const patterns = extension_settings[extensionName].excludePatterns || [];
-
-  // 检查是否已存在
-  if (patterns.some(p => p.name === name)) {
-    toastr.warning("该规则名称已存在", "添加失败");
-    return false;
-  }
-
-  patterns.push({ name, regex });
-  extension_settings[extensionName].excludePatterns = patterns;
-  saveSettingsDebounced();
-  updateExcludePatternsList();
-
-  console.log(`添加屏蔽规则: ${name}`);
-  return true;
-}
-
-/**
- * 删除屏蔽规则
- */
-function removeExcludePattern(name) {
-  const patterns = extension_settings[extensionName].excludePatterns || [];
-  extension_settings[extensionName].excludePatterns = patterns.filter(p => p.name !== name);
-  saveSettingsDebounced();
-  updateExcludePatternsList();
-  console.log(`删除屏蔽规则: ${name}`);
-}
-
-/**
- * 更新屏蔽规则列表UI
- */
-function updateExcludePatternsList() {
-  const patterns = extension_settings[extensionName].excludePatterns || [];
-  const listContainer = $("#exclude_patterns_list");
-
-  if (patterns.length === 0) {
-    listContainer.html('<small style="color: var(--sf-text-secondary);">暂无屏蔽规则，点击上方预设按钮快速添加</small>');
-    return;
-  }
-
-  let html = '';
-  patterns.forEach(pattern => {
-    html += `
-      <div class="exclude-pattern-item" style="margin: 5px 0; padding: 10px 12px; background: rgba(0,0,0,0.2); border: 1px solid var(--sf-glass-border); border-radius: 8px; display: flex; justify-content: space-between; align-items: center;">
-        <div style="flex: 1; overflow: hidden;">
-          <span style="font-weight: 500; color: var(--sf-text-primary);">${pattern.name}</span>
-          <br/></br>
-          <small style="color: var(--sf-text-secondary); font-family: monospace; font-size: 0.75em; word-break: break-all;">${escapeHtml(pattern.regex)}</small>
-        </div>
-        <button class="menu_button delete-pattern" data-name="${escapeHtml(pattern.name)}" style="padding: 4px 10px; font-size: 0.75em; margin-left: 10px;">
-          <i class="fa-solid fa-trash"></i>
-        </button>
-      </div>
-    `;
-  });
-
-  listContainer.html(html);
-}
-
-/**
- * HTML转义
- */
-function escapeHtml(text) {
-  const div = document.createElement('div');
-  div.textContent = text;
-  return div.innerHTML;
 }
 
 // ==================== TTS功能 ====================
@@ -691,6 +547,7 @@ async function generateTTS(text) {
       speed: speed,
       gain: gain
     };
+
     console.log('TTS请求参数:', {
       模型: model,
       音色: voiceParam,
@@ -736,7 +593,7 @@ async function generateTTS(text) {
       });
     }
 
-    const downloadLink = $(`<a href="${audioUrl}" download="tts_output.${extension_settings[extensionName].responseFormat}">下载音频</a>`);
+    const downloadLink = $(`<a href="${audioUrl}" download="tts_output.mp3">下载音频</a>`);
     $("#tts_output").empty().append(downloadLink);
 
     console.log("语音生成成功！");
@@ -748,21 +605,50 @@ async function generateTTS(text) {
   }
 }
 
-// 监听消息事件，自动提取文本并生成语音
+// ==================== 消息处理 ====================
+
+function processMessageForTTS(message) {
+  // 1. 先应用屏蔽规则
+  let processedText = applyFilterRules(message);
+
+  // 2. 再应用标记提取
+  const textStartStr = $("#image_text_start").val();
+  const textEndStr = $("#image_text_end").val();
+
+  if (textStartStr && textEndStr) {
+    const startMarkers = parseMarkers(textStartStr);
+    const endMarkers = parseMarkers(textEndStr);
+
+    if (startMarkers.length > 0 && endMarkers.length > 0) {
+      const extractedTexts = extractTextWithMultipleMarkers(processedText, startMarkers, endMarkers);
+
+      if (extractedTexts.length > 0) {
+        return extractedTexts.join(' ');
+      }
+
+      // 有标记但没提取到内容，返回空
+      console.log('设置了标记但未找到匹配内容');
+      return null;
+    }
+  }
+
+  // 没有设置标记，返回过滤后的全文
+  return processedText;
+}
+
 function setupMessageListener() {
   console.log('设置消息监听器');
 
+  // 角色消息监听
   eventSource.on(event_types.CHARACTER_MESSAGE_RENDERED, async (messageId) => {
     console.log('角色消息渲染:', messageId);
 
     if (audioState.lastProcessedMessageId === messageId) {
-      console.log('消息已处理，跳过:', messageId);
       return;
     }
 
     const autoPlay = $("#auto_play_audio").prop("checked");
     if (!autoPlay) {
-      console.log('自动朗读未开启');
       return;
     }
 
@@ -781,22 +667,19 @@ function setupMessageListener() {
       const message = messageElement.find('.mes_text').text();
 
       if (!message) {
-        console.log('消息内容为空');
         return;
       }
 
-      // 使用新的文本处理流程
-      const processedText = processTextForTTS(message);
+      const textToSpeak = processMessageForTTS(message);
 
-      if (processedText) {
-        console.log('处理后文本:', processedText.substring(0, 100) + '...');
-        generateTTS(processedText);
-      } else {
-        console.log('处理后无有效文本，跳过朗读');
+      if (textToSpeak) {
+        console.log('朗读文本:', textToSpeak.substring(0, 100));
+        generateTTS(textToSpeak);
       }
     }, 1000);
   });
 
+  // 用户消息监听
   eventSource.on(event_types.USER_MESSAGE_RENDERED, async (messageId) => {
     console.log('用户消息渲染:', messageId);
 
@@ -819,17 +702,18 @@ function setupMessageListener() {
         return;
       }
 
-      // 使用新的文本处理流程
-      const processedText = processTextForTTS(message);
+      const textToSpeak = processMessageForTTS(message);
 
-      if (processedText) {
-        generateTTS(processedText);
+      if (textToSpeak) {
+        console.log('朗读用户消息:', textToSpeak.substring(0, 100));
+        generateTTS(textToSpeak);
       }
     }, 500);
   });
 }
 
-// 克隆音色功能
+// ==================== 克隆音色 ====================
+
 async function uploadVoice() {
   const apiKey = extension_settings[extensionName].apiKey;
   const apiUrl = extension_settings[extensionName].apiUrl || defaultSettings.apiUrl;
@@ -853,14 +737,8 @@ async function uploadVoice() {
     return;
   }
 
-  if (voiceName.length > 64) {
-    toastr.error("音色名称不能超过64个字符", "格式错误");
-    return;
-  }
-
   try {
-    console.log("开始上传音色...");
-    $("#upload_voice").prop("disabled", true).text("上传中...");
+    $("#upload_voice").prop("disabled", true).html('<i class="fa-solid fa-spinner fa-spin"></i> 上传中...');
 
     const reader = new FileReader();
 
@@ -885,9 +763,7 @@ async function uploadVoice() {
         });
 
         if (!response.ok) {
-          const errorText = await response.text();
-          console.error("Upload error response:", errorText);
-
+          // 尝试FormData方式
           const formData = new FormData();
           formData.append('model', 'FunAudioLLM/CosyVoice2-0.5B');
           formData.append('customName', voiceName);
@@ -915,12 +791,6 @@ async function uploadVoice() {
           if (!response2.ok) {
             throw new Error(`HTTP ${response2.status}: ${await response2.text()}`);
           }
-
-          const data = await response2.json();
-          console.log("音色上传成功(FormData):", data);
-        } else {
-          const data = await response.json();
-          console.log("音色上传成功(JSON):", data);
         }
 
         $("#clone_voice_name").val("");
@@ -928,14 +798,13 @@ async function uploadVoice() {
         $("#clone_voice_audio").val("");
 
         toastr.success(`音色 "${voiceName}" 克隆成功！`, "克隆音色");
-
         await loadCustomVoices();
 
       } catch (error) {
         console.error("Voice Clone Error:", error);
         toastr.error(`音色克隆失败: ${error.message}`, "克隆音色错误");
       } finally {
-        $("#upload_voice").prop("disabled", false).text("上传克隆音色");
+        $("#upload_voice").prop("disabled", false).html('<i class="fa-solid fa-upload"></i> 上传克隆音色');
       }
     };
 
@@ -944,11 +813,10 @@ async function uploadVoice() {
   } catch (error) {
     console.error("Voice Clone Error:", error);
     toastr.error(`音色克隆失败: ${error.message}`, "克隆音色错误");
-    $("#upload_voice").prop("disabled", false).text("上传克隆音色");
+    $("#upload_voice").prop("disabled", false).html('<i class="fa-solid fa-upload"></i> 上传克隆音色');
   }
 }
 
-// 获取自定义音色列表
 async function loadCustomVoices() {
   const apiKey = extension_settings[extensionName].apiKey;
   const apiUrl = extension_settings[extensionName].apiUrl || defaultSettings.apiUrl;
@@ -969,13 +837,7 @@ async function loadCustomVoices() {
     }
 
     const data = await response.json();
-    console.log("自定义音色列表:", data);
-
     extension_settings[extensionName].customVoices = data.result || data.results || [];
-
-    if (extension_settings[extensionName].customVoices.length > 0) {
-      console.log("第一个自定义音色结构:", extension_settings[extensionName].customVoices[0]);
-    }
 
     updateCustomVoicesList();
     updateVoiceOptions();
@@ -985,7 +847,6 @@ async function loadCustomVoices() {
   }
 }
 
-// 更新自定义音色列表显示
 function updateCustomVoicesList() {
   const customVoices = extension_settings[extensionName].customVoices || [];
   const listContainer = $("#custom_voices_list");
@@ -1000,9 +861,14 @@ function updateCustomVoicesList() {
     const voiceName = voice.name || voice.customName || voice.custom_name || "未命名";
     const voiceUri = voice.uri || voice.id || voice.voice_id;
     html += `
-      <div class="custom-voice-item" style="margin: 5px 0; padding: 5px; border: 1px solid #ddd; border-radius: 4px; display: flex; justify-content: space-between; align-items: center;">
-        <span>${voiceName}</span>
-        <button class="menu_button delete-voice" data-uri="${voiceUri}" data-name="${voiceName}" style="padding: 2px 8px; font-size: 12px;">删除</button>
+      <div class="custom-voice-item" style="display: flex; align-items: center; justify-content: space-between; padding: 10px; margin-bottom: 8px; background: rgba(0,0,0,0.2); border-radius: 8px; border: 1px solid rgba(255,255,255,0.1);">
+        <span style="display: flex; align-items: center; gap: 8px;">
+          <i class="fa-solid fa-microphone" style="color: #a78bfa;"></i>
+          ${voiceName}
+        </span>
+        <button class="menu_button delete-voice" data-uri="${voiceUri}" data-name="${voiceName}" style="padding: 5px 10px; background: rgba(239,68,68,0.2) !important;">
+          <i class="fa-solid fa-trash" style="color: #ef4444;"></i>
+        </button>
       </div>
     `;
   });
@@ -1010,7 +876,6 @@ function updateCustomVoicesList() {
   listContainer.html(html);
 }
 
-// 删除自定义音色
 async function deleteCustomVoice(uri, name) {
   const apiKey = extension_settings[extensionName].apiKey;
   const apiUrl = extension_settings[extensionName].apiUrl || defaultSettings.apiUrl;
@@ -1039,7 +904,6 @@ async function deleteCustomVoice(uri, name) {
     }
 
     toastr.success(`音色 "${name}" 已删除`, "删除成功");
-
     await loadCustomVoices();
 
   } catch (error) {
@@ -1048,12 +912,13 @@ async function deleteCustomVoice(uri, name) {
   }
 }
 
-// jQuery加载时初始化
+// ==================== 初始化 ====================
+
 jQuery(async () => {
   const settingsHtml = await $.get(`${extensionFolderPath}/example.html`);
   $("#extensions_settings").append(settingsHtml);
 
-  // Inline drawer 折叠/展开功能
+  // 折叠面板事件
   setTimeout(() => {
     $('.siliconflow-extension-settings .inline-drawer-toggle').each(function() {
       $(this).off('click').on('click', function(e) {
@@ -1078,76 +943,62 @@ jQuery(async () => {
     });
   }, 100);
 
-  // 绑定事件
+  // 基础事件绑定
   $("#save_siliconflow_settings").on("click", saveSettings);
   $("#test_siliconflow_connection").on("click", testConnection);
-
-  // 获取模型按钮
   $("#fetch_models_btn").on("click", fetchAvailableModels);
-
-  // 测试模型按钮
   $("#test_model_btn").on("click", testCurrentModel);
 
-  // 刷新音色按钮
   $("#refresh_voices_btn").on("click", function() {
     updateVoiceOptions();
-    fetchModelVoices();
     loadCustomVoices();
   });
 
-  // 模型切换时更新音色
   $("#tts_model").on("change", function() {
     extension_settings[extensionName].ttsModel = $(this).val();
     updateVoiceOptions();
-    fetchModelVoices();
     saveSettingsDebounced();
   });
 
-  // 音色切换
   $("#tts_voice").on("change", function() {
     extension_settings[extensionName].ttsVoice = $(this).val();
-    console.log("选择的音色:", $(this).val());
     saveSettingsDebounced();
   });
 
-  // API地址变更时自动保存
   $("#siliconflow_api_url").on("change", function() {
     extension_settings[extensionName].apiUrl = $(this).val();
     saveSettingsDebounced();
   });
 
-  // 克隆音色功能事件
+  // 克隆音色事件
   $("#upload_voice").on("click", uploadVoice);
   $("#refresh_custom_voices").on("click", loadCustomVoices);
 
-  // 删除音色事件（使用事件委托）
   $(document).on("click", ".delete-voice", function() {
     const uri = $(this).data("uri");
     const name = $(this).data("name");
     deleteCustomVoice(uri, name);
   });
 
-  // 自动保存复选框状态
+  // 自动朗读开关
   $("#auto_play_audio").on("change", function() {
     extension_settings[extensionName].autoPlay = $(this).prop("checked");
     saveSettingsDebounced();
-    console.log("自动朗读角色消息:", $(this).prop("checked"));
   });
 
   $("#auto_play_user").on("change", function() {
     extension_settings[extensionName].autoPlayUser = $(this).prop("checked");
     saveSettingsDebounced();
-    console.log("自动朗读用户消息:", $(this).prop("checked"));
   });
 
-  // 标记设置自动保存
+  // 标记设置
   $("#image_text_start, #image_text_end").on("input", function() {
     extension_settings[extensionName].textStart = $("#image_text_start").val();
     extension_settings[extensionName].textEnd = $("#image_text_end").val();
     saveSettingsDebounced();
   });
 
-  // 语速和音量滑块
+  // 滑块事件
   $("#tts_speed").on("input", function() {
     $("#tts_speed_value").text($(this).val());
     extension_settings[extensionName].ttsSpeed = parseFloat($(this).val());
@@ -1160,72 +1011,52 @@ jQuery(async () => {
     saveSettingsDebounced();
   });
 
-  // TTS测试按钮
+  // TTS测试
   $("#test_tts").on("click", async function() {
-    extension_settings[extensionName].ttsVoice = $("#tts_voice").val();
     const testText = $("#tts_test_text").val() || "你好，这是一个测试语音。";
     await generateTTS(testText);
   });
 
-  // ==================== 正则屏蔽规则事件 ====================
+  // ========== 正则屏蔽规则事件 ==========
+
+  // 预设规则按钮
+  $(document).on("click", ".preset-filter-btn", function() {
+    const name = $(this).data("name");
+    const pattern = $(this).data("pattern");
+    addFilterRule(name, pattern);
+  });
 
   // 添加自定义规则
-  $("#add_exclude_pattern").on("click", function() {
-    const name = $("#exclude_pattern_name").val().trim();
-    const regex = $("#exclude_pattern_regex").val().trim();
+  $("#add_filter_rule").on("click", function() {
+    const name = $("#filter_rule_name").val().trim();
+    const pattern = $("#filter_rule_pattern").val().trim();
 
-    if (addExcludePattern(name, regex)) {
-      $("#exclude_pattern_name").val("");
-      $("#exclude_pattern_regex").val("");
-      toastr.success(`规则 "${name}" 已添加`, "添加成功");
+    if (addFilterRule(name, pattern)) {
+      $("#filter_rule_name").val("");
+      $("#filter_rule_pattern").val("");
     }
   });
 
-  // 预设规则按钮
-  $("#preset_exclude_think").on("click", function() {
-    addExcludePattern("think标签", "");
-  });
-
-  $("#preset_exclude_thinking").on("click", function() {
-    addExcludePattern("thinking标签", "<thinking>[\\s\\S]*?");
-  });
-
-  $("#preset_exclude_cot").on("click", function() {</thinking>
-    addExcludePattern("HTML注释(CoT)", "<!--[\\s\\S]*?-->");
-  });
-
-  $("#preset_exclude_analysis").on("click", function() {</!--[\\s\\S]*?-->
-    addExcludePattern("analysis标签", "<analysis>[\\s\\S]*?</analysis>");
-  });
-
-  // 删除规则事件（使用事件委托）
-  $(document).on("click", ".delete-pattern", function() {
+  // 切换规则状态
+  $(document).on("click", ".toggle-rule-btn", function() {
     const name = $(this).data("name");
-    removeExcludePattern(name);
-    toastr.success(`规则 "${name}" 已删除`, "删除成功");
+    toggleFilterRule(name);
   });
 
-  // 清空所有规则
-  $("#clear_all_patterns").on("click", function() {
-    if (confirm("确定要清空所有屏蔽规则吗？")) {
-      extension_settings[extensionName].excludePatterns = [];
-      saveSettingsDebounced();
-      updateExcludePatternsList();
-      toastr.success("所有规则已清空", "清空成功");
+  // 删除规则
+  $(document).on("click", ".delete-rule-btn", function() {
+    const name = $(this).data("name");
+    if (confirm(`确定要删除规则 "${name}" 吗？`)) {
+      removeFilterRule(name);
     }
   });
 
   // 加载设置
   await loadSettings();
-
-  // 加载自定义音色列表
   await loadCustomVoices();
-
-  // 设置消息监听器
   setupMessageListener();
 
-  console.log("硅基流动插件已加载");
-  console.log("自动朗读功能已启用，请在控制台查看调试信息");
+  console.log("硅基流动插件已加载 - 包含正则屏蔽和多标记提取功能");
 });
 
 export { generateTTS };
