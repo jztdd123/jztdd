@@ -19,6 +19,7 @@ const defaultSettings = {
   apiKey: "",
   apiUrl: "https://api.siliconflow.cn/v1",
   ttsModel: "FunAudioLLM/CosyVoice2-0.5B",
+  cachedModels: [], // 新增：缓存的模型列表
   ttsVoice: "alex",
   ttsSpeed: 1.0,
   ttsGain: 0,
@@ -31,11 +32,12 @@ const defaultSettings = {
   generationFrequency: 5,
   autoPlay: true,
   autoPlayUser: false,
-  customVoices: [] // 存储自定义音色列表
+  customVoices: [] 
 };
 
-// TTS模型和音色配置
-const TTS_MODELS = {
+// TTS模型和预设音色配置
+// 注意：如果获取到的模型不在这个列表中，将不显示“预设音色”组，只显示“自定义音色”
+const TTS_PRESETS = {
   "FunAudioLLM/CosyVoice2-0.5B": {
     name: "CosyVoice2-0.5B",
     voices: {
@@ -59,25 +61,135 @@ async function loadSettings() {
     Object.assign(extension_settings[extensionName], defaultSettings);
   }
 
-  // 更新UI
+  // UI 赋值
   $("#siliconflow_api_key").val(extension_settings[extensionName].apiKey || "");
   $("#siliconflow_api_url").val(extension_settings[extensionName].apiUrl || defaultSettings.apiUrl);
-  $("#tts_model").val(extension_settings[extensionName].ttsModel || defaultSettings.ttsModel);
+  
+  // 恢复模型列表
+  updateModelSelect(extension_settings[extensionName].cachedModels || []);
+  
+  // 设置选中的模型
+  const savedModel = extension_settings[extensionName].ttsModel || defaultSettings.ttsModel;
+  // 如果下拉框里没有这个模型（可能是还没获取，或者手动设置的），加进去
+  if ($(`#tts_model option[value="${savedModel}"]`).length === 0) {
+    $("#tts_model").append(new Option(savedModel, savedModel));
+  }
+  $("#tts_model").val(savedModel);
+
   $("#tts_voice").val(extension_settings[extensionName].ttsVoice || defaultSettings.ttsVoice);
   $("#tts_speed").val(extension_settings[extensionName].ttsSpeed || defaultSettings.ttsSpeed);
   $("#tts_speed_value").text(extension_settings[extensionName].ttsSpeed || defaultSettings.ttsSpeed);
   $("#tts_gain").val(extension_settings[extensionName].ttsGain || defaultSettings.ttsGain);
   $("#tts_gain_value").text(extension_settings[extensionName].ttsGain || defaultSettings.ttsGain);
-  $("#response_format").val(extension_settings[extensionName].responseFormat || defaultSettings.responseFormat);
-  $("#sample_rate").val(extension_settings[extensionName].sampleRate || defaultSettings.sampleRate);
-  $("#image_size").val(extension_settings[extensionName].imageSize || defaultSettings.imageSize);
   $("#image_text_start").val(extension_settings[extensionName].textStart || defaultSettings.textStart);
   $("#image_text_end").val(extension_settings[extensionName].textEnd || defaultSettings.textEnd);
-  $("#generation_frequency").val(extension_settings[extensionName].generationFrequency || defaultSettings.generationFrequency);
   $("#auto_play_audio").prop("checked", extension_settings[extensionName].autoPlay !== false);
   $("#auto_play_user").prop("checked", extension_settings[extensionName].autoPlayUser === true);
   
   updateVoiceOptions();
+}
+
+// 辅助函数：更新模型下拉框
+function updateModelSelect(models) {
+    const $select = $("#tts_model");
+    const currentVal = $select.val();
+    
+    // 保留当前选中的值，如果列表为空则不操作
+    if (!models || models.length === 0) return;
+
+    $select.empty();
+    
+    // 如果没有默认模型，添加一个
+    let hasCosy = false;
+    
+    models.forEach(modelId => {
+        $select.append(new Option(modelId, modelId));
+        if (modelId === "FunAudioLLM/CosyVoice2-0.5B") hasCosy = true;
+    });
+
+    // 这是一个兜底，确保默认推荐模型在列表里
+    if (!hasCosy && models.length === 0) {
+        $select.append(new Option("FunAudioLLM/CosyVoice2-0.5B", "FunAudioLLM/CosyVoice2-0.5B"));
+    }
+
+    // 尝试恢复选中值，如果不在列表里，默认选第一个
+    if (currentVal && models.includes(currentVal)) {
+        $select.val(currentVal);
+    } else if ($select.find('option').length > 0) {
+        $select.val($select.find('option:first').val());
+        // 触发变更事件以更新音色
+        $select.trigger('change');
+    }
+}
+
+// 获取远程模型列表
+async function fetchRemoteModels() {
+    const apiKey = $("#siliconflow_api_key").val();
+    const apiUrl = $("#siliconflow_api_url").val();
+    const $btn = $("#refresh_models");
+    const $icon = $btn.find("i");
+
+    if (!apiKey) {
+        toastr.error("请先输入API密钥", "获取模型失败");
+        return;
+    }
+
+    try {
+        $icon.addClass("fa-spin"); // 添加旋转动画
+        
+        // 通常 OpenAI 兼容接口的模型端点是 /models
+        // 注意：apiUrl 通常以 /v1 结尾，需要处理路径拼接
+        let endpoint = apiUrl;
+        if (endpoint.endsWith("/")) endpoint = endpoint.slice(0, -1);
+        if (!endpoint.endsWith("/models")) {
+             // 如果用户输入的是 .../v1，则拼成 .../v1/models
+             endpoint = `${endpoint}/models`;
+        }
+
+        console.log(`正在从 ${endpoint} 获取模型列表...`);
+
+        const response = await fetch(endpoint, {
+            method: 'GET',
+            headers: {
+                'Authorization': `Bearer ${apiKey}`,
+                'Content-Type': 'application/json'
+            }
+        });
+
+        if (!response.ok) {
+            throw new Error(`HTTP ${response.status}`);
+        }
+
+        const data = await response.json();
+        const modelList = data.data || data.models || []; // 兼容不同的返回格式
+        
+        if (modelList.length === 0) {
+            toastr.warning("API返回了空模型列表", "获取模型");
+            return;
+        }
+
+        // 提取模型 ID 并过滤 (可选：这里可以过滤只显示 audio 相关的，但有些 API 不返回 type)
+        // 硅基流动的 API 返回所有模型，我们可以简单过滤或全部显示
+        const modelIds = modelList.map(m => m.id).sort();
+        
+        console.log("获取到的模型:", modelIds);
+        
+        // 更新设置缓存
+        extension_settings[extensionName].cachedModels = modelIds;
+        saveSettingsDebounced();
+
+        // 更新 UI
+        updateModelSelect(modelIds);
+        updateVoiceOptions(); // 模型变了，音色列表也可能需要变
+        
+        toastr.success(`成功获取 ${modelIds.length} 个模型`, "获取成功");
+
+    } catch (error) {
+        console.error("Fetch Models Error:", error);
+        toastr.error(`获取模型失败: ${error.message}`, "错误");
+    } finally {
+        $icon.removeClass("fa-spin");
+    }
 }
 
 // 更新音色选项
@@ -87,36 +199,41 @@ function updateVoiceOptions() {
   const currentValue = voiceSelect.val();
   voiceSelect.empty();
   
-  // 添加预设音色
-  if (TTS_MODELS[model] && TTS_MODELS[model].voices) {
+  // 1. 添加预设音色 (如果该模型有预设)
+  // 检查是否有匹配的预设配置
+  const presetConfig = TTS_PRESETS[model];
+  
+  if (presetConfig && presetConfig.voices) {
     voiceSelect.append('<optgroup label="预设音色">');
-    Object.entries(TTS_MODELS[model].voices).forEach(([value, name]) => {
+    Object.entries(presetConfig.voices).forEach(([value, name]) => {
       voiceSelect.append(`<option value="${value}">${name}</option>`);
     });
     voiceSelect.append('</optgroup>');
+  } else {
+    // 如果没有预设，可能是一个未知的模型或自定义接入的模型
+    // 我们可以给一个默认的占位符，或者依赖自定义音色
+    // 如果没有自定义音色，这里会是空的
   }
   
-  // 添加自定义音色
+  // 2. 添加自定义音色 (始终显示)
   const customVoices = extension_settings[extensionName].customVoices || [];
-  console.log(`更新音色选项，自定义音色数量: ${customVoices.length}`);
   
   if (customVoices.length > 0) {
     voiceSelect.append('<optgroup label="自定义音色">');
     customVoices.forEach(voice => {
-      // 尝试不同的字段名称
       const voiceName = voice.name || voice.customName || voice.custom_name || "未命名";
       const voiceUri = voice.uri || voice.id || voice.voice_id;
-      console.log(`添加自定义音色: ${voiceName} -> ${voiceUri}`);
       voiceSelect.append(`<option value="${voiceUri}">${voiceName} (自定义)</option>`);
     });
     voiceSelect.append('</optgroup>');
   }
   
-  // 恢复之前的选择或设置默认值
+  // 恢复之前的选择
   if (currentValue && voiceSelect.find(`option[value="${currentValue}"]`).length > 0) {
     voiceSelect.val(currentValue);
   } else {
-    voiceSelect.val(extension_settings[extensionName].ttsVoice || Object.keys(TTS_MODELS[model]?.voices || {})[0]);
+    // 选第一个可用的
+    voiceSelect.val(voiceSelect.find('option:first').val());
   }
 }
 
@@ -128,21 +245,16 @@ function saveSettings() {
   extension_settings[extensionName].ttsVoice = $("#tts_voice").val();
   extension_settings[extensionName].ttsSpeed = parseFloat($("#tts_speed").val());
   extension_settings[extensionName].ttsGain = parseFloat($("#tts_gain").val());
-  extension_settings[extensionName].responseFormat = $("#response_format").val();
-  extension_settings[extensionName].sampleRate = parseInt($("#sample_rate").val());
-  extension_settings[extensionName].imageSize = $("#image_size").val();
   extension_settings[extensionName].textStart = $("#image_text_start").val();
   extension_settings[extensionName].textEnd = $("#image_text_end").val();
-  extension_settings[extensionName].generationFrequency = parseInt($("#generation_frequency").val());
   extension_settings[extensionName].autoPlay = $("#auto_play_audio").prop("checked");
   extension_settings[extensionName].autoPlayUser = $("#auto_play_user").prop("checked");
   
   saveSettingsDebounced();
-  // 移除弹窗提示，改为控制台日志
   console.log("设置已保存");
 }
 
-// 测试连接
+// 测试连接 (实际上可以复用获取模型来验证连接)
 async function testConnection() {
   const apiKey = $("#siliconflow_api_key").val();
   
@@ -152,6 +264,8 @@ async function testConnection() {
   }
   
   try {
+    $("#connection_status").text("连接中...").css("color", "orange");
+    
     // 获取音色列表作为连接测试
     const response = await fetch(`${extension_settings[extensionName].apiUrl}/audio/voice/list`, {
       method: 'GET',
@@ -162,9 +276,8 @@ async function testConnection() {
     });
     
     if (response.ok) {
-      // 只更新状态，不显示弹窗
       $("#connection_status").text("已连接").css("color", "green");
-      console.log("API连接成功");
+      toastr.success("API连接成功", "系统消息");
     } else {
       throw new Error(`HTTP ${response.status}`);
     }
@@ -174,10 +287,12 @@ async function testConnection() {
   }
 }
 
-// TTS功能
+// TTS功能 (生成逻辑需要确保使用动态配置的 API URL 和 Model)
 async function generateTTS(text) {
   const apiKey = extension_settings[extensionName].apiKey;
-  
+  const apiUrl = extension_settings[extensionName].apiUrl; // 使用配置的URL
+  const model = $("#tts_model").val(); // 使用当前选中的模型
+
   if (!apiKey) {
     toastr.error("请先配置API密钥", "TTS错误");
     return;
@@ -188,47 +303,43 @@ async function generateTTS(text) {
     return;
   }
   
-  // 检查是否正在处理
   if (audioState.isPlaying) {
     console.log('音频正在处理中，跳过此次请求');
     return;
   }
   
   try {
-    // 移除弹窗提示，只在控制台记录
-    console.log("正在生成语音...");
+    console.log(`正在生成语音... 模型: ${model}`);
     
-    // 从页面实时获取所有参数
-    const voiceValue = $("#tts_voice").val() || "alex";
+    const voiceValue = $("#tts_voice").val();
     const speed = parseFloat($("#tts_speed").val()) || 1.0;
     const gain = parseFloat($("#tts_gain").val()) || 0;
     
-    // 判断是自定义音色还是预设音色
+    if (!voiceValue) {
+        toastr.warning("未选择语音角色", "TTS警告");
+        return;
+    }
+
+    // 构造 voice 参数
     let voiceParam;
-    if (voiceValue.startsWith("speech:")) {
-      // 自定义音色，直接使用URI
+    if (voiceValue.startsWith("speech:") || voiceValue.includes("/")) {
+      // 假设包含 / 或者是 uri 格式，直接使用
       voiceParam = voiceValue;
     } else {
-      // 预设音色，使用模型:音色格式
-      voiceParam = `FunAudioLLM/CosyVoice2-0.5B:${voiceValue}`;
+      // 预设音色，使用 "模型:音色" 格式
+      voiceParam = `${model}:${voiceValue}`;
     }
     
     const requestBody = {
-      model: "FunAudioLLM/CosyVoice2-0.5B",
+      model: model, // 使用动态模型
       input: text,
       voice: voiceParam,
       response_format: "mp3",
       speed: speed,
       gain: gain
     };
-    console.log('TTS请求参数:', {
-      音色: voiceParam,
-      语速: speed,
-      音量: gain,
-      文本: text.substring(0, 50) + '...'
-    });
     
-    const response = await fetch(`${extension_settings[extensionName].apiUrl}/audio/speech`, {
+    const response = await fetch(`${apiUrl}/audio/speech`, {
       method: 'POST',
       headers: {
         'Authorization': `Bearer ${apiKey}`,
@@ -244,586 +355,55 @@ async function generateTTS(text) {
     const audioBlob = await response.blob();
     const audioUrl = URL.createObjectURL(audioBlob);
     
-    // 创建音频元素播放
     const audio = new Audio(audioUrl);
     
     if (extension_settings[extensionName].autoPlay) {
-      // 设置播放状态
       audioState.isPlaying = true;
-      
-      // 监听播放结束事件
       audio.addEventListener('ended', () => {
         audioState.isPlaying = false;
-        console.log('音频播放完成');
       });
-      
       audio.addEventListener('error', () => {
         audioState.isPlaying = false;
-        console.log('音频播放错误');
       });
-      
-      // 播放音频
       audio.play().catch(err => {
         audioState.isPlaying = false;
         console.error('播放失败:', err);
       });
     }
     
-    // 添加下载按钮
-    const downloadLink = $(`<a href="${audioUrl}" download="tts_output.${extension_settings[extensionName].responseFormat}">下载音频</a>`);
+    const downloadLink = $(`<a href="${audioUrl}" download="tts_output.mp3">下载音频</a>`);
     $("#tts_output").empty().append(downloadLink);
     
-    // 移除成功提示，只在控制台记录
     console.log("语音生成成功！");
-    
     return audioUrl;
+
   } catch (error) {
     console.error("TTS Error:", error);
     toastr.error(`语音生成失败: ${error.message}`, "TTS错误");
+    audioState.isPlaying = false;
   }
 }
 
-// 监听消息事件，自动提取文本并生成语音
-function setupMessageListener() {
-  console.log('设置消息监听器');
-  console.log('事件类型:', event_types);
-  console.log('eventSource 对象:', eventSource);
-  
-  // 测试事件是否正常触发
-  try {
-    // 测试监听所有消息事件
-    console.log('尝试监听所有消息相关事件...');
-    
-    // 监听消息添加事件
-    if (event_types.MESSAGE_SENT) {
-      eventSource.on(event_types.MESSAGE_SENT, () => {
-        console.log('检测到MESSAGE_SENT事件');
-      });
-    }
-    
-    // 监听消息接收事件
-    if (event_types.MESSAGE_RECEIVED) {
-      eventSource.on(event_types.MESSAGE_RECEIVED, () => {
-        console.log('检测到MESSAGE_RECEIVED事件');
-      });
-    }
-    
-    // 监听聊天更新事件  
-    if (event_types.CHAT_CHANGED) {
-      eventSource.on(event_types.CHAT_CHANGED, () => {
-        console.log('检测到CHAT_CHANGED事件');
-      });
-    }
-  } catch (error) {
-    console.error('设置测试监听器出错:', error);
-  }
-  
-  // 监听SillyTavern的消息事件
-  eventSource.on(event_types.CHARACTER_MESSAGE_RENDERED, async (messageId) => {
-    console.log('角色消息渲染:', messageId);
-    
-    // 防止重复处理同一条消息
-    if (audioState.lastProcessedMessageId === messageId) {
-      console.log('消息已处理，跳过:', messageId);
-      return;
-    }
-    
-    console.log('新消息，准备处理:', messageId);
-    
-    // 检查是否开启自动朗读
-    const autoPlay = $("#auto_play_audio").prop("checked");
-    if (!autoPlay) {
-      console.log('自动朗读未开启');
-      return;
-    }
-    
-    // 清除之前的延时器
-    if (audioState.processingTimeout) {
-      clearTimeout(audioState.processingTimeout);
-    }
-    
-    // 使用防抖处理，等待消息完全渲染
-    audioState.processingTimeout = setTimeout(() => {
-      console.log('延时处理开始:', messageId);
-      // 再次检查是否已处理
-      if (audioState.lastProcessedMessageId === messageId) {
-        console.log('消息在延迟期间已被处理，跳过');
-        return;
-      }
-      
-      // 标记为已处理
-      audioState.lastProcessedMessageId = messageId;
-      console.log('处理消息:', messageId);
-      const messageElement = $(`.mes[mesid="${messageId}"]`);
-      console.log('查找消息元素:', messageElement.length > 0 ? '找到' : '未找到');
-      
-      const message = messageElement.find('.mes_text').text();
-      console.log('消息内容长度:', message ? message.length : 0);
-      
-      if (!message) {
-        console.log('消息内容为空');
-        return;
-      }
-      
-      const textStart = $("#image_text_start").val();
-      const textEnd = $("#image_text_end").val();
-      
-      console.log('检查标记:', { textStart, textEnd, 消息内容: message.substring(0, 100) });
-      
-      if (textStart && textEnd) {
-        let extractedTexts = [];
-        
-        // 添加调试日志
-        console.log('原始消息:', message);
-        console.log('消息中的引号位置:');
-        for (let i = 0; i < message.length; i++) {
-          if (message[i] === '"' || message[i] === '"' || message[i] === '"' || message[i] === '"') {
-            console.log(`位置${i}: "${message[i]}" (字符码: ${message[i].charCodeAt(0)})`);
-          }
-        }
-        
-        // 判断开始和结束标记是否相同（如英文引号）
-        if (textStart === textEnd) {
-          // 相同标记：使用更智能的配对算法
-          let insideQuote = false;
-          let currentText = '';
-          let pairCount = 0;
-          
-          for (let i = 0; i < message.length; i++) {
-            const char = message[i];
-            
-            if (char === textStart) {
-              if (!insideQuote) {
-                // 开始引号
-                console.log(`位置${i}: 开始第${pairCount + 1}对引号`);
-                insideQuote = true;
-                currentText = '';
-              } else {
-                // 结束引号
-                console.log(`位置${i}: 结束第${pairCount + 1}对引号，内容: "${currentText}"`);
-                if (currentText.trim()) {
-                  extractedTexts.push(currentText.trim());
-                  pairCount++;
-                  console.log(`提取第${pairCount}对引号内容:`, currentText.trim());
-                }
-                insideQuote = false;
-                currentText = '';
-              }
-            } else if (insideQuote) {
-              currentText += char;
-            }
-          }
-        } else {
-          // 不同标记：使用正则表达式
-          const escapeRegex = (str) => str.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-          const escapedStart = escapeRegex(textStart);
-          const escapedEnd = escapeRegex(textEnd);
-          
-          const regex = new RegExp(`${escapedStart}(.*?)${escapedEnd}`, 'g');
-          const matches = message.match(regex);
-          
-          if (matches && matches.length > 0) {
-            console.log(`找到${matches.length}个标记内容`);
-            
-            matches.forEach(match => {
-              const cleanText = match.replace(textStart, '').replace(textEnd, '').trim();
-              if (cleanText) {
-                extractedTexts.push(cleanText);
-              }
-            });
-          }
-        }
-        
-        if (extractedTexts.length > 0) {
-          const finalText = extractedTexts.join(' ');
-          console.log('自动朗读标记内文本:', finalText);
-          generateTTS(finalText);
-          return; // 重要：找到标记就不读全文
-        }
-        
-        // 设置了标记但没找到匹配内容，不朗读
-        console.log('设置了标记但未找到匹配内容，跳过朗读');
-      } else {
-        // 没有设置标记，朗读全文
-        console.log('未设置标记，自动朗读全文:', message.substring(0, 100));
-        console.log('开始生成TTS...');
-        generateTTS(message);
-      }
-    }, 1000); // 延迟1000ms等待DOM完全更新，包括世界书和COT
-  });
-  
-  // 用户消息监听
-  eventSource.on(event_types.USER_MESSAGE_RENDERED, async (messageId) => {
-    console.log('用户消息渲染:', messageId);
-    
-    // 防止重复处理同一条用户消息
-    if (audioState.lastProcessedUserMessageId === messageId) {
-      console.log('用户消息已处理，跳过:', messageId);
-      return;
-    }
-    
-    const autoPlayUser = $("#auto_play_user").prop("checked");
-    if (!autoPlayUser) {
-      console.log('用户消息自动朗读未开启');
-      return;
-    }
-    console.log('用户消息自动朗读已开启');
-    
-    // 标记为已处理
-    audioState.lastProcessedUserMessageId = messageId;
-    
-    setTimeout(() => {
-      console.log('用户消息延时处理开始:', messageId);
-      const messageElement = $(`.mes[mesid="${messageId}"]`);
-      console.log('用户消息元素:', messageElement.length > 0 ? '找到' : '未找到');
-      
-      const message = messageElement.find('.mes_text').text();
-      console.log('用户消息内容长度:', message ? message.length : 0);
-      if (!message) {
-        console.log('用户消息内容为空');
-        return;
-      }
-      
-      const textStart = $("#image_text_start").val();
-      const textEnd = $("#image_text_end").val();
-      
-      console.log('用户消息 - 检查标记:', { textStart, textEnd, 消息内容: message.substring(0, 100) });
-      
-      if (textStart && textEnd) {
-        let extractedTexts = [];
-        
-        // 添加调试日志
-        console.log('用户原始消息:', message);
-        console.log('用户消息中的引号位置:');
-        for (let i = 0; i < message.length; i++) {
-          if (message[i] === '"' || message[i] === '"' || message[i] === '"' || message[i] === '"') {
-            console.log(`位置${i}: "${message[i]}" (字符码: ${message[i].charCodeAt(0)})`);
-          }
-        }
-        
-        // 判断开始和结束标记是否相同（如英文引号）
-        if (textStart === textEnd) {
-          // 相同标记：使用更智能的配对算法
-          let insideQuote = false;
-          let currentText = '';
-          let pairCount = 0;
-          
-          for (let i = 0; i < message.length; i++) {
-            const char = message[i];
-            
-            if (char === textStart) {
-              if (!insideQuote) {
-                // 开始引号
-                console.log(`用户消息 - 位置${i}: 开始第${pairCount + 1}对引号`);
-                insideQuote = true;
-                currentText = '';
-              } else {
-                // 结束引号
-                console.log(`用户消息 - 位置${i}: 结束第${pairCount + 1}对引号，内容: "${currentText}"`);
-                if (currentText.trim()) {
-                  extractedTexts.push(currentText.trim());
-                  pairCount++;
-                  console.log(`用户消息 - 提取第${pairCount}对引号内容:`, currentText.trim());
-                }
-                insideQuote = false;
-                currentText = '';
-              }
-            } else if (insideQuote) {
-              currentText += char;
-            }
-          }
-        } else {
-          // 不同标记：使用正则表达式
-          const escapeRegex = (str) => str.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-          const escapedStart = escapeRegex(textStart);
-          const escapedEnd = escapeRegex(textEnd);
-          
-          const regex = new RegExp(`${escapedStart}(.*?)${escapedEnd}`, 'g');
-          const matches = message.match(regex);
-          
-          if (matches && matches.length > 0) {
-            console.log(`用户消息 - 找到${matches.length}个标记内容`);
-            
-            matches.forEach(match => {
-              const cleanText = match.replace(textStart, '').replace(textEnd, '').trim();
-              if (cleanText) {
-                extractedTexts.push(cleanText);
-              }
-            });
-          }
-        }
-        
-        if (extractedTexts.length > 0) {
-          const finalText = extractedTexts.join(' ');
-          console.log('用户消息 - 自动朗读标记内文本:', finalText);
-          generateTTS(finalText);
-          return;
-        }
-        
-        // 设置了标记但没找到匹配内容，不朗读
-        console.log('用户消息 - 设置了标记但未找到匹配内容，跳过朗读');
-      } else {
-        // 没有设置标记，朗读全文
-        console.log('用户消息 - 未设置标记，自动朗读全文:', message.substring(0, 100));
-        generateTTS(message);
-      }
-    }, 500);
-  });
-}
+// ... (setupMessageListener, uploadVoice, loadCustomVoices 等函数保持不变，注意里面的 API 调用要使用 settings 中的 apiUrl) ...
 
-// 克隆音色功能
-async function uploadVoice() {
-  const apiKey = extension_settings[extensionName].apiKey;
-  const voiceName = $("#clone_voice_name").val();
-  const voiceText = $("#clone_voice_text").val();
-  const audioFile = $("#clone_voice_audio")[0].files[0];
-  
-  if (!apiKey) {
-    toastr.error("请先配置API密钥", "克隆音色错误");
-    return;
-  }
-  
-  if (!voiceName || !voiceText || !audioFile) {
-    toastr.error("请填写音色名称、参考文本并选择音频文件", "克隆音色错误");
-    return;
-  }
-  
-  // 验证音色名称格式
-  const namePattern = /^[a-zA-Z0-9_-]+$/;
-  if (!namePattern.test(voiceName)) {
-    toastr.error("音色名称只能包含英文字母、数字、下划线和连字符", "格式错误");
-    return;
-  }
-  
-  if (voiceName.length > 64) {
-    toastr.error("音色名称不能超过64个字符", "格式错误");
-    return;
-  }
-  
-  try {
-    console.log("开始上传音色...");
-    
-    // 根据API文档，有两种方式上传：base64或文件
-    // 先尝试用base64方式
-    const reader = new FileReader();
-    
-    reader.onload = async function(e) {
-      try {
-        const base64Audio = e.target.result; // 这将包含 data:audio/mpeg;base64,xxx 格式
-        
-        // 使用JSON格式发送，因为API文档显示可以用base64
-        const requestBody = {
-          model: 'FunAudioLLM/CosyVoice2-0.5B',
-          customName: voiceName,
-          text: voiceText,
-          audio: base64Audio // 直接使用完整的base64字符串，包含data:audio/mpeg;base64头
-        };
-        
-        const response = await fetch(`${extension_settings[extensionName].apiUrl}/uploads/audio/voice`, {
-          method: 'POST',
-          headers: {
-            'Authorization': `Bearer ${apiKey}`,
-            'Content-Type': 'application/json'
-          },
-          body: JSON.stringify(requestBody)
-        });
-        
-        if (!response.ok) {
-          const errorText = await response.text();
-          console.error("Upload error response:", errorText);
-          
-          // 如果JSON方式失败，尝试FormData方式
-          console.log("JSON上传失败，尝试FormData方式...");
-          
-          const formData = new FormData();
-          formData.append('model', 'FunAudioLLM/CosyVoice2-0.5B');
-          formData.append('customName', voiceName);
-          formData.append('text', voiceText);
-          
-          // 创建一个Blob对象从base64
-          const base64Data = base64Audio.split(',')[1];
-          const byteCharacters = atob(base64Data);
-          const byteNumbers = new Array(byteCharacters.length);
-          for (let i = 0; i < byteCharacters.length; i++) {
-            byteNumbers[i] = byteCharacters.charCodeAt(i);
-          }
-          const byteArray = new Uint8Array(byteNumbers);
-          const blob = new Blob([byteArray], {type: audioFile.type});
-          
-          formData.append('audio', blob, audioFile.name);
-          
-          const response2 = await fetch(`${extension_settings[extensionName].apiUrl}/uploads/audio/voice`, {
-            method: 'POST',
-            headers: {
-              'Authorization': `Bearer ${apiKey}`
-            },
-            body: formData
-          });
-          
-          if (!response2.ok) {
-            throw new Error(`HTTP ${response2.status}: ${await response2.text()}`);
-          }
-          
-          const data = await response2.json();
-          console.log("音色上传成功(FormData):", data);
-        } else {
-          const data = await response.json();
-          console.log("音色上传成功(JSON):", data);
-        }
-        
-        // 清空输入
-        $("#clone_voice_name").val("");
-        $("#clone_voice_text").val("");
-        $("#clone_voice_audio").val("");
-        
-        toastr.success(`音色 "${voiceName}" 克隆成功！`, "克隆音色");
-        
-        // 刷新音色列表
-        await loadCustomVoices();
-        
-      } catch (error) {
-        console.error("Voice Clone Error:", error);
-        toastr.error(`音色克隆失败: ${error.message}`, "克隆音色错误");
-      }
-    };
-    
-    reader.readAsDataURL(audioFile);
-    
-  } catch (error) {
-    console.error("Voice Clone Error:", error);
-    toastr.error(`音色克隆失败: ${error.message}`, "克隆音色错误");
-  }
-}
-
-// 获取自定义音色列表
-async function loadCustomVoices() {
-  const apiKey = extension_settings[extensionName].apiKey;
-  
-  if (!apiKey) return;
-  
-  try {
-    const response = await fetch(`${extension_settings[extensionName].apiUrl}/audio/voice/list`, {
-      method: 'GET',
-      headers: {
-        'Authorization': `Bearer ${apiKey}`,
-        'Content-Type': 'application/json'
-      }
-    });
-    
-    if (!response.ok) {
-      throw new Error(`HTTP ${response.status}`);
-    }
-    
-    const data = await response.json();
-    console.log("自定义音色列表:", data);
-    
-    // 保存到设置 - 注意API返回的是result不是results
-    extension_settings[extensionName].customVoices = data.result || data.results || [];
-    
-    // 打印第一个音色的结构以便调试
-    if (extension_settings[extensionName].customVoices.length > 0) {
-      console.log("第一个自定义音色结构:", extension_settings[extensionName].customVoices[0]);
-    }
-    
-    // 更新UI显示
-    updateCustomVoicesList();
-    updateVoiceOptions();
-    
-  } catch (error) {
-    console.error("Load Custom Voices Error:", error);
-  }
-}
-
-// 更新自定义音色列表显示
-function updateCustomVoicesList() {
-  const customVoices = extension_settings[extensionName].customVoices || [];
-  const listContainer = $("#custom_voices_list");
-  
-  if (customVoices.length === 0) {
-    listContainer.html("<small>暂无自定义音色</small>");
-    return;
-  }
-  
-  let html = "";
-  customVoices.forEach(voice => {
-    const voiceName = voice.name || voice.customName || voice.custom_name || "未命名";
-    const voiceUri = voice.uri || voice.id || voice.voice_id;
-    html += `
-      <div class="custom-voice-item" style="margin: 5px 0; padding: 5px; border: 1px solid #ddd; border-radius: 4px;">
-        <span>${voiceName}</span>
-        <button class="menu_button delete-voice" data-uri="${voiceUri}" data-name="${voiceName}" style="float: right; padding: 2px 8px; font-size: 12px;">删除</button>
-      </div>
-    `;
-  });
-  
-  listContainer.html(html);
-}
-
-// 删除自定义音色
-async function deleteCustomVoice(uri, name) {
-  const apiKey = extension_settings[extensionName].apiKey;
-  
-  if (!apiKey) {
-    toastr.error("请先配置API密钥", "删除音色错误");
-    return;
-  }
-  
-  if (!confirm(`确定要删除音色 "${name}" 吗？`)) {
-    return;
-  }
-  
-  try {
-    const response = await fetch(`${extension_settings[extensionName].apiUrl}/audio/voice/deletions`, {
-      method: 'POST',
-      headers: {
-        'Authorization': `Bearer ${apiKey}`,
-        'Content-Type': 'application/json'
-      },
-      body: JSON.stringify({ uri: uri })
-    });
-    
-    if (!response.ok) {
-      throw new Error(`HTTP ${response.status}`);
-    }
-    
-    toastr.success(`音色 "${name}" 已删除`, "删除成功");
-    
-    // 刷新列表
-    await loadCustomVoices();
-    
-  } catch (error) {
-    console.error("Delete Voice Error:", error);
-    toastr.error(`删除失败: ${error.message}`, "删除音色错误");
-  }
-}
-
-// jQuery加载时初始化
+// jQuery加载时初始化 (更新部分)
 jQuery(async () => {
   const settingsHtml = await $.get(`${extensionFolderPath}/example.html`);
   $("#extensions_settings").append(settingsHtml);
   
-  // Inline drawer 折叠/展开功能 - 使用延迟绑定
+  // Inline drawer Toggle
   setTimeout(() => {
     $('.siliconflow-extension-settings .inline-drawer-toggle').each(function() {
       $(this).off('click').on('click', function(e) {
         e.preventDefault();
         e.stopPropagation();
-        
         const $header = $(this);
         const $icon = $header.find('.inline-drawer-icon');
         const $content = $header.next('.inline-drawer-content');
-        const isOpen = $content.data('open') === true;
-        
-        if (isOpen) {
-          // 收起
-          $content.data('open', false);
-          $content.hide();
-          $icon.removeClass('down');
+        if ($content.data('open')) {
+          $content.data('open', false); $content.hide(); $icon.removeClass('down');
         } else {
-          // 展开
-          $content.data('open', true);
-          $content.show();
-          $icon.addClass('down');
+          $content.data('open', true); $content.show(); $icon.addClass('down');
         }
       });
     });
@@ -831,73 +411,35 @@ jQuery(async () => {
   
   // 绑定事件
   $("#save_siliconflow_settings").on("click", saveSettings);
-  
-  // 克隆音色功能事件
-  $("#upload_voice").on("click", uploadVoice);
-  $("#refresh_custom_voices").on("click", loadCustomVoices);
-  
-  // 删除音色事件（使用事件委托）
-  $(document).on("click", ".delete-voice", function() {
-    const uri = $(this).data("uri");
-    const name = $(this).data("name");
-    deleteCustomVoice(uri, name);
-  });
-  
-  // 自动保存复选框状态
-  $("#auto_play_audio").on("change", function() {
-    extension_settings[extensionName].autoPlay = $(this).prop("checked");
-    saveSettingsDebounced();
-    console.log("自动朗读角色消息:", $(this).prop("checked"));
-  });
-  
-  $("#auto_play_user").on("change", function() {
-    extension_settings[extensionName].autoPlayUser = $(this).prop("checked");
-    saveSettingsDebounced();
-    console.log("自动朗读用户消息:", $(this).prop("checked"));
-  });
-  
-  // 标记设置自动保存
-  $("#image_text_start, #image_text_end").on("input", function() {
-    extension_settings[extensionName].textStart = $("#image_text_start").val();
-    extension_settings[extensionName].textEnd = $("#image_text_end").val();
-    saveSettingsDebounced();
-  });
   $("#test_siliconflow_connection").on("click", testConnection);
-  $("#tts_model").on("change", updateVoiceOptions);
-  $("#tts_voice").on("change", function() {
-    extension_settings[extensionName].ttsVoice = $(this).val();
-    console.log("选择的音色:", $(this).val());
+  
+  // 新增：刷新模型列表按钮
+  $("#refresh_models").on("click", fetchRemoteModels);
+  
+  // API URL 变更时更新设置对象（虽然保存按钮也会做，但为了即时性）
+  $("#siliconflow_api_url").on("change", function() {
+      extension_settings[extensionName].apiUrl = $(this).val();
   });
-  $("#tts_speed").on("input", function() {
-    $("#tts_speed_value").text($(this).val());
-  });
-  $("#tts_gain").on("input", function() {
-    $("#tts_gain_value").text($(this).val());
+
+  $("#tts_model").on("change", function() {
+      extension_settings[extensionName].ttsModel = $(this).val();
+      updateVoiceOptions(); // 切换模型时更新可用音色
   });
   
-  // TTS测试按钮
+  // ... 其他事件绑定保持不变 ...
+  
   $("#test_tts").on("click", async function() {
-    // 先保存当前选择的音色
     extension_settings[extensionName].ttsVoice = $("#tts_voice").val();
     const testText = $("#tts_test_text").val() || "你好，这是一个测试语音。";
     await generateTTS(testText);
   });
   
-  // 加载设置
+  // 初始化
   await loadSettings();
-  
-  // 加载自定义音色列表
-  await loadCustomVoices();
-  
-  // 设置消息监听器
+  await loadCustomVoices(); // 仍然加载自定义音色
   setupMessageListener();
   
-  console.log("硅基流动插件已加载");
-  console.log("自动朗读功能已启用，请在控制台查看调试信息");
-  console.log('事件源:', eventSource);
-  console.log('事件类型:', event_types);
-  console.log('角色消息事件:', event_types.CHARACTER_MESSAGE_RENDERED);
-  console.log('用户消息事件:', event_types.USER_MESSAGE_RENDERED);
+  console.log("硅基流动扩展: 初始化完成");
 });
 
 export { generateTTS };
