@@ -26,14 +26,24 @@ const defaultSettings = {
   sampleRate: 32000,
   imageModel: "",
   imageSize: "512",
-  textStart: "「",
-  textEnd: "」",
+  textStart: "",
+  textEnd: "",
   generationFrequency: 5,
   autoPlay: true,
   autoPlayUser: false,
   customVoices: [],
   availableModels: [],
-  regexFilter: "|\\*[^*]+\\*"
+  // 新增：正则屏蔽规则
+  excludePatterns: [],
+  // 预设的屏蔽规则
+  presetExcludes: {
+    think: "",
+    thinking: "<thinking>[\\s\\S]*?",</thinking>
+    analysis: "<analysis>[\\s\\S]*?</analysis>",
+    note: "<note>[\\s\\S]*?</note>",
+    cot: "<!--[\\s\\S]*?-->",</!--[\\s\\S]*?-->
+    system: "<system>[\\s\\S]*?</system>"
+  }
 };
 
 // TTS模型和音色配置
@@ -52,129 +62,6 @@ const TTS_MODELS = {
     }
   }
 };
-
-// 预处理文本：应用正则屏蔽
-function preprocessText(text) {
-  const regexPattern = $("#regex_filter").val().trim();
-
-  if (!regexPattern) {
-    return text;
-  }
-
-  try {
-    const regex = new RegExp(regexPattern, 'gi');
-    const filtered = text.replace(regex, '');
-    console.log('正则屏蔽前:', text.substring(0, 100));
-    console.log('正则屏蔽后:', filtered.substring(0, 100));
-    return filtered.trim();
-  } catch (error) {
-    console.error('正则表达式错误:', error);
-    return text;
-  }
-}
-
-// 提取标记内文本（支持多标记对）
-function extractMarkedText(message) {
-  const textStartInput = $("#image_text_start").val().trim();
-  const textEndInput = $("#image_text_end").val().trim();
-
-  if (!textStartInput || !textEndInput) {
-    return null;
-  }
-
-  // 解析多标记对（用逗号分隔）
-  const startMarkers = textStartInput.split(',').map(s => s.trim()).filter(s => s);
-  const endMarkers = textEndInput.split(',').map(s => s.trim()).filter(s => s);
-
-  if (startMarkers.length !== endMarkers.length) {
-    console.warn('开始标记和结束标记数量不匹配，使用较少的一方');
-  }
-
-  let extractedTexts = [];
-  const pairCount = Math.min(startMarkers.length, endMarkers.length);
-
-  for (let p = 0; p < pairCount; p++) {
-    const textStart = startMarkers[p];
-    const textEnd = endMarkers[p];
-
-    console.log(`处理第${p + 1}组标记: "${textStart}" ... "${textEnd}"`);
-
-    if (textStart === textEnd) {
-      // 相同标记：配对算法
-      let insideQuote = false;
-      let currentText = '';
-
-      for (let i = 0; i < message.length; i++) {
-        const char = message[i];
-        const matchesMarker = message.substring(i, i + textStart.length) === textStart;
-
-        if (matchesMarker) {
-          if (!insideQuote) {
-            insideQuote = true;
-            currentText = '';
-            i += textStart.length - 1;
-          } else {
-            if (currentText.trim()) {
-              extractedTexts.push(currentText.trim());
-            }
-            insideQuote = false;
-            currentText = '';
-            i += textStart.length - 1;
-          }
-        } else if (insideQuote) {
-          currentText += char;
-        }
-      }
-    } else {
-      // 不同标记：正则匹配
-      const escapeRegex = (str) => str.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-      const escapedStart = escapeRegex(textStart);
-      const escapedEnd = escapeRegex(textEnd);
-
-      const regex = new RegExp(`${escapedStart}([\\s\\S]*?)${escapedEnd}`, 'g');
-      let match;
-
-      while ((match = regex.exec(message)) !== null) {
-        const cleanText = match[1].trim();
-        if (cleanText) {
-          extractedTexts.push(cleanText);
-        }
-      }
-    }
-  }
-
-  if (extractedTexts.length > 0) {
-    console.log(`共提取到 ${extractedTexts.length} 段文本`);
-    return extractedTexts.join(' ');
-  }
-
-  return '';
-}
-
-// 处理消息文本的主函数
-function processMessageForTTS(message) {
-  // 1. 先应用正则屏蔽
-  let processedText = preprocessText(message);
-
-  if (!processedText.trim()) {
-    console.log('正则屏蔽后文本为空');
-    return null;
-  }
-
-  // 2. 提取标记内文本
-  const markedText = extractMarkedText(processedText);
-
-  if (markedText === null) {
-    return processedText;
-  }
-
-  if (markedText === '') {
-    console.log('设置了标记但未找到匹配内容');
-    return null;
-  }
-
-  return markedText;
-}
 
 // 从API获取可用模型
 async function fetchAvailableModels() {
@@ -392,6 +279,12 @@ async function loadSettings() {
     Object.assign(extension_settings[extensionName], defaultSettings);
   }
 
+  // 确保新字段存在
+  if (!extension_settings[extensionName].excludePatterns) {
+    extension_settings[extensionName].excludePatterns = [];
+  }
+
+  // 更新UI
   $("#siliconflow_api_key").val(extension_settings[extensionName].apiKey || "");
   $("#siliconflow_api_url").val(extension_settings[extensionName].apiUrl || defaultSettings.apiUrl);
   $("#tts_model").val(extension_settings[extensionName].ttsModel || defaultSettings.ttsModel);
@@ -408,13 +301,13 @@ async function loadSettings() {
   $("#generation_frequency").val(extension_settings[extensionName].generationFrequency || defaultSettings.generationFrequency);
   $("#auto_play_audio").prop("checked", extension_settings[extensionName].autoPlay !== false);
   $("#auto_play_user").prop("checked", extension_settings[extensionName].autoPlayUser === true);
-  $("#regex_filter").val(extension_settings[extensionName].regexFilter || defaultSettings.regexFilter);
 
   if (extension_settings[extensionName].availableModels && extension_settings[extensionName].availableModels.length > 0) {
     updateModelDropdown(extension_settings[extensionName].availableModels);
   }
 
   updateVoiceOptions();
+  updateExcludePatternsList();
 }
 
 // 更新音色选项
@@ -476,7 +369,6 @@ function saveSettings() {
   extension_settings[extensionName].generationFrequency = parseInt($("#generation_frequency").val());
   extension_settings[extensionName].autoPlay = $("#auto_play_audio").prop("checked");
   extension_settings[extensionName].autoPlayUser = $("#auto_play_user").prop("checked");
-  extension_settings[extensionName].regexFilter = $("#regex_filter").val();
 
   saveSettingsDebounced();
   console.log("设置已保存");
@@ -518,7 +410,245 @@ async function testConnection() {
   }
 }
 
-// TTS功能
+// ==================== 新增：文本处理函数 ====================
+
+/**
+ * 应用正则屏蔽规则，从文本中移除匹配的内容
+ * @param {string} text - 原始文本
+ * @returns {string} - 处理后的文本
+ */
+function applyExcludePatterns(text) {
+  const patterns = extension_settings[extensionName].excludePatterns || [];
+
+  if (patterns.length === 0) {
+    return text;
+  }
+
+  let result = text;
+
+  patterns.forEach(pattern => {
+    try {
+      const regex = new RegExp(pattern.regex, 'gi');
+      const before = result;
+      result = result.replace(regex, '');
+      if (before !== result) {
+        console.log(`正则屏蔽规则 "${pattern.name}" 已应用`);
+      }
+    } catch (e) {
+      console.error(`正则表达式错误 (${pattern.name}):`, e);
+    }
+  });
+
+  // 清理多余的空行
+  result = result.replace(/\n{3,}/g, '\n\n').trim();
+
+  return result;
+}
+
+/**
+ * 从文本中提取标记内的内容（支持多组标记，用逗号分隔）
+ * @param {string} text - 原始文本
+ * @param {string} startMarkers - 开始标记（多个用逗号分隔）
+ * @param {string} endMarkers - 结束标记（多个用逗号分隔）
+ * @returns {string} - 提取的文本
+ */
+function extractMarkedText(text, startMarkers, endMarkers) {
+  if (!startMarkers || !endMarkers) {
+    return text;
+  }
+
+  // 分割多个标记
+  const starts = startMarkers.split(',').map(s => s.trim()).filter(s => s);
+  const ends = endMarkers.split(',').map(s => s.trim()).filter(s => s);
+
+  // 如果数量不匹配，取最小数量
+  const pairCount = Math.min(starts.length, ends.length);
+
+  if (pairCount === 0) {
+    return text;
+  }
+
+  let extractedTexts = [];
+
+  for (let i = 0; i < pairCount; i++) {
+    const textStart = starts[i];
+    const textEnd = ends[i];
+
+    console.log(`处理标记对 ${i + 1}: "${textStart}" ... "${textEnd}"`);
+
+    if (textStart === textEnd) {
+      // 相同标记：配对算法
+      let insideQuote = false;
+      let currentText = '';
+
+      for (let j = 0; j < text.length; j++) {
+        // 检查是否匹配标记（支持多字符标记）
+        const matchStart = text.substring(j, j + textStart.length) === textStart;
+
+        if (matchStart) {
+          if (!insideQuote) {
+            insideQuote = true;
+            currentText = '';
+            j += textStart.length - 1; // 跳过标记字符
+          } else {
+            if (currentText.trim()) {
+              extractedTexts.push(currentText.trim());
+            }
+            insideQuote = false;
+            currentText = '';
+            j += textEnd.length - 1;
+          }
+        } else if (insideQuote) {
+          currentText += text[j];
+        }
+      }
+    } else {
+      // 不同标记：使用正则表达式
+      const escapeRegex = (str) => str.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+      const escapedStart = escapeRegex(textStart);
+      const escapedEnd = escapeRegex(textEnd);
+
+      const regex = new RegExp(`${escapedStart}([\\s\\S]*?)${escapedEnd}`, 'g');
+      let match;
+
+      while ((match = regex.exec(text)) !== null) {
+        if (match[1] && match[1].trim()) {
+          extractedTexts.push(match[1].trim());
+        }
+      }
+    }
+  }
+
+  if (extractedTexts.length > 0) {
+    return extractedTexts.join(' ');
+  }
+
+  // 没有找到匹配内容
+  console.log('未找到标记匹配内容');
+  return '';
+}
+
+/**
+ * 完整的文本处理流程
+ * @param {string} text - 原始文本
+ * @returns {string} - 处理后的文本
+ */
+function processTextForTTS(text) {
+  console.log('=== 开始文本处理 ===');
+  console.log('原始文本长度:', text.length);
+
+  // 步骤1：应用正则屏蔽规则
+  let processedText = applyExcludePatterns(text);
+  console.log('屏蔽后文本长度:', processedText.length);
+
+  // 步骤2：提取标记内容
+  const textStart = $("#image_text_start").val();
+  const textEnd = $("#image_text_end").val();
+
+  if (textStart && textEnd) {
+    const extracted = extractMarkedText(processedText, textStart, textEnd);
+    if (extracted) {
+      processedText = extracted;
+      console.log('提取后文本长度:', processedText.length);
+    } else {
+      console.log('标记提取无结果，跳过朗读');
+      return '';
+    }
+  }
+
+  console.log('=== 文本处理完成 ===');
+  return processedText;
+}
+
+// ==================== 正则屏蔽规则管理 ====================
+
+/**
+ * 添加屏蔽规则
+ */
+function addExcludePattern(name, regex) {
+  if (!name || !regex) {
+    toastr.error("名称和正则表达式不能为空", "添加失败");
+    return false;
+  }
+
+  // 验证正则表达式
+  try {
+    new RegExp(regex);
+  } catch (e) {
+    toastr.error(`正则表达式无效: ${e.message}`, "添加失败");
+    return false;
+  }
+
+  const patterns = extension_settings[extensionName].excludePatterns || [];
+
+  // 检查是否已存在
+  if (patterns.some(p => p.name === name)) {
+    toastr.warning("该规则名称已存在", "添加失败");
+    return false;
+  }
+
+  patterns.push({ name, regex });
+  extension_settings[extensionName].excludePatterns = patterns;
+  saveSettingsDebounced();
+  updateExcludePatternsList();
+
+  console.log(`添加屏蔽规则: ${name}`);
+  return true;
+}
+
+/**
+ * 删除屏蔽规则
+ */
+function removeExcludePattern(name) {
+  const patterns = extension_settings[extensionName].excludePatterns || [];
+  extension_settings[extensionName].excludePatterns = patterns.filter(p => p.name !== name);
+  saveSettingsDebounced();
+  updateExcludePatternsList();
+  console.log(`删除屏蔽规则: ${name}`);
+}
+
+/**
+ * 更新屏蔽规则列表UI
+ */
+function updateExcludePatternsList() {
+  const patterns = extension_settings[extensionName].excludePatterns || [];
+  const listContainer = $("#exclude_patterns_list");
+
+  if (patterns.length === 0) {
+    listContainer.html('<small style="color: var(--sf-text-secondary);">暂无屏蔽规则，点击上方预设按钮快速添加</small>');
+    return;
+  }
+
+  let html = '';
+  patterns.forEach(pattern => {
+    html += `
+      <div class="exclude-pattern-item" style="margin: 5px 0; padding: 10px 12px; background: rgba(0,0,0,0.2); border: 1px solid var(--sf-glass-border); border-radius: 8px; display: flex; justify-content: space-between; align-items: center;">
+        <div style="flex: 1; overflow: hidden;">
+          <span style="font-weight: 500; color: var(--sf-text-primary);">${pattern.name}</span>
+          <br/></br>
+          <small style="color: var(--sf-text-secondary); font-family: monospace; font-size: 0.75em; word-break: break-all;">${escapeHtml(pattern.regex)}</small>
+        </div>
+        <button class="menu_button delete-pattern" data-name="${escapeHtml(pattern.name)}" style="padding: 4px 10px; font-size: 0.75em; margin-left: 10px;">
+          <i class="fa-solid fa-trash"></i>
+        </button>
+      </div>
+    `;
+  });
+
+  listContainer.html(html);
+}
+
+/**
+ * HTML转义
+ */
+function escapeHtml(text) {
+  const div = document.createElement('div');
+  div.textContent = text;
+  return div.innerHTML;
+}
+
+// ==================== TTS功能 ====================
+
 async function generateTTS(text) {
   const apiKey = extension_settings[extensionName].apiKey;
   const apiUrl = extension_settings[extensionName].apiUrl || defaultSettings.apiUrl;
@@ -618,7 +748,7 @@ async function generateTTS(text) {
   }
 }
 
-// 监听消息事件
+// 监听消息事件，自动提取文本并生成语音
 function setupMessageListener() {
   console.log('设置消息监听器');
 
@@ -655,13 +785,14 @@ function setupMessageListener() {
         return;
       }
 
-      const textToSpeak = processMessageForTTS(message);
+      // 使用新的文本处理流程
+      const processedText = processTextForTTS(message);
 
-      if (textToSpeak) {
-        console.log('准备朗读:', textToSpeak.substring(0, 100));
-        generateTTS(textToSpeak);
+      if (processedText) {
+        console.log('处理后文本:', processedText.substring(0, 100) + '...');
+        generateTTS(processedText);
       } else {
-        console.log('无需朗读的内容');
+        console.log('处理后无有效文本，跳过朗读');
       }
     }, 1000);
   });
@@ -688,11 +819,11 @@ function setupMessageListener() {
         return;
       }
 
-      const textToSpeak = processMessageForTTS(message);
+      // 使用新的文本处理流程
+      const processedText = processTextForTTS(message);
 
-      if (textToSpeak) {
-        console.log('用户消息准备朗读:', textToSpeak.substring(0, 100));
-        generateTTS(textToSpeak);
+      if (processedText) {
+        generateTTS(processedText);
       }
     }, 500);
   });
@@ -756,8 +887,6 @@ async function uploadVoice() {
         if (!response.ok) {
           const errorText = await response.text();
           console.error("Upload error response:", errorText);
-
-          console.log("JSON上传失败，尝试FormData方式...");
 
           const formData = new FormData();
           formData.append('model', 'FunAudioLLM/CosyVoice2-0.5B');
@@ -1018,23 +1147,6 @@ jQuery(async () => {
     saveSettingsDebounced();
   });
 
-  // 正则屏蔽自动保存
-  $("#regex_filter").on("input", function() {
-    extension_settings[extensionName].regexFilter = $(this).val();
-    saveSettingsDebounced();
-  });
-
-  // 测试正则按钮
-  $("#test_regex").on("click", function() {
-    const testText = $("#regex_test_text").val();
-    if (!testText) {
-      $("#regex_test_result").text("请输入测试文本");
-      return;
-    }
-    const result = preprocessText(testText);
-    $("#regex_test_result").text(result || "(过滤后为空)");
-  });
-
   // 语速和音量滑块
   $("#tts_speed").on("input", function() {
     $("#tts_speed_value").text($(this).val());
@@ -1055,6 +1167,54 @@ jQuery(async () => {
     await generateTTS(testText);
   });
 
+  // ==================== 正则屏蔽规则事件 ====================
+
+  // 添加自定义规则
+  $("#add_exclude_pattern").on("click", function() {
+    const name = $("#exclude_pattern_name").val().trim();
+    const regex = $("#exclude_pattern_regex").val().trim();
+
+    if (addExcludePattern(name, regex)) {
+      $("#exclude_pattern_name").val("");
+      $("#exclude_pattern_regex").val("");
+      toastr.success(`规则 "${name}" 已添加`, "添加成功");
+    }
+  });
+
+  // 预设规则按钮
+  $("#preset_exclude_think").on("click", function() {
+    addExcludePattern("think标签", "");
+  });
+
+  $("#preset_exclude_thinking").on("click", function() {
+    addExcludePattern("thinking标签", "<thinking>[\\s\\S]*?");
+  });
+
+  $("#preset_exclude_cot").on("click", function() {</thinking>
+    addExcludePattern("HTML注释(CoT)", "<!--[\\s\\S]*?-->");
+  });
+
+  $("#preset_exclude_analysis").on("click", function() {</!--[\\s\\S]*?-->
+    addExcludePattern("analysis标签", "<analysis>[\\s\\S]*?</analysis>");
+  });
+
+  // 删除规则事件（使用事件委托）
+  $(document).on("click", ".delete-pattern", function() {
+    const name = $(this).data("name");
+    removeExcludePattern(name);
+    toastr.success(`规则 "${name}" 已删除`, "删除成功");
+  });
+
+  // 清空所有规则
+  $("#clear_all_patterns").on("click", function() {
+    if (confirm("确定要清空所有屏蔽规则吗？")) {
+      extension_settings[extensionName].excludePatterns = [];
+      saveSettingsDebounced();
+      updateExcludePatternsList();
+      toastr.success("所有规则已清空", "清空成功");
+    }
+  });
+
   // 加载设置
   await loadSettings();
 
@@ -1065,7 +1225,7 @@ jQuery(async () => {
   setupMessageListener();
 
   console.log("硅基流动插件已加载");
-  console.log("自动朗读功能已启用");
+  console.log("自动朗读功能已启用，请在控制台查看调试信息");
 });
 
 export { generateTTS };
