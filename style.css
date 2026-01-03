@@ -1,200 +1,612 @@
-/* SiliconFlow 插件现代化 UI 样式表 */
+/* SiliconFlow 插件现代化 UI 样式表 - 高级美化版 */
 
+/* ===== 基础变量定义 ===== */
 .siliconflow-extension-settings {
-    font-family: 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
-    color: var(--SmartThemeBodyColor);
-    padding: 10px;
+    --sf-primary: #7c3aed;
+    --sf-primary-light: #a78bfa;
+    --sf-primary-dark: #5b21b6;
+    --sf-success: #10b981;
+    --sf-danger: #ef4444;
+    --sf-warning: #f59e0b;
+    --sf-glass-bg: rgba(15, 15, 25, 0.6);
+    --sf-glass-border: rgba(255, 255, 255, 0.08);
+    --sf-glass-highlight: rgba(255, 255, 255, 0.12);
+    --sf-text-primary: rgba(255, 255, 255, 0.95);
+    --sf-text-secondary: rgba(255, 255, 255, 0.6);
+    --sf-shadow-sm: 0 2px 8px rgba(0, 0, 0, 0.15);
+    --sf-shadow-md: 0 8px 24px rgba(0, 0, 0, 0.25);
+    --sf-shadow-glow: 0 0 20px rgba(124, 58, 237, 0.3);
+    --sf-radius-sm: 8px;
+    --sf-radius-md: 12px;
+    --sf-radius-lg: 16px;
+
+    font-family: 'Inter', 'Segoe UI', -apple-system, BlinkMacSystemFont, sans-serif;
+    color: var(--sf-text-primary);
+    padding: 12px;
 }
 
-/* 折叠面板美化 */
+/* ===== 主折叠面板 ===== */
 .siliconflow-extension-settings .inline-drawer {
-    background: var(--SmartThemeBlurTintColor);
-    border: 1px solid rgba(255, 255, 255, 0.1);
-    border-radius: 12px;
-    margin-bottom: 15px;
-    box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
+    background: var(--sf-glass-bg);
+    border: 1px solid var(--sf-glass-border);
+    border-radius: var(--sf-radius-lg);
+    margin-bottom: 16px;
+    box-shadow: var(--sf-shadow-md);
     overflow: hidden;
-    backdrop-filter: blur(10px);
+    backdrop-filter: blur(20px) saturate(180%);
+    -webkit-backdrop-filter: blur(20px) saturate(180%);
+    position: relative;
 }
 
+.siliconflow-extension-settings .inline-drawer::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    height: 1px;
+    background: linear-gradient(90deg,
+        transparent,
+        var(--sf-glass-highlight) 20%,
+        var(--sf-glass-highlight) 80%,
+        transparent
+    );
+}
+
+/* ===== 面板头部 ===== */
 .siliconflow-extension-settings .inline-drawer-header {
-    padding: 12px 18px;
-    background: rgba(0, 0, 0, 0.1);
+    padding: 16px 20px;
+    background: linear-gradient(135deg,
+        rgba(124, 58, 237, 0.15) 0%,
+        rgba(124, 58, 237, 0.05) 100%
+    );
     display: flex;
     justify-content: space-between;
     align-items: center;
     font-weight: 600;
-    transition: all 0.2s ease;
+    font-size: 1.05em;
+    letter-spacing: 0.02em;
+    cursor: pointer;
+    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    border-bottom: 1px solid var(--sf-glass-border);
 }
 
 .siliconflow-extension-settings .inline-drawer-header:hover {
-    background: rgba(0, 0, 0, 0.2);
+    background: linear-gradient(135deg,
+        rgba(124, 58, 237, 0.25) 0%,
+        rgba(124, 58, 237, 0.1) 100%
+    );
+}
+
+.siliconflow-extension-settings .inline-drawer-header b {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+}
+
+.siliconflow-extension-settings .inline-drawer-header b::before {
+    content: '🎙️';
+    font-size: 1.2em;
 }
 
 .siliconflow-extension-settings .inline-drawer-icon {
-    font-size: 14px;
+    font-size: 12px;
     opacity: 0.7;
-    transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    transition: transform 0.4s cubic-bezier(0.34, 1.56, 0.64, 1);
+    width: 24px;
+    height: 24px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: rgba(255, 255, 255, 0.05);
+    border-radius: 50%;
 }
 
 .siliconflow-extension-settings .inline-drawer-icon.down {
     transform: rotate(180deg);
+    background: rgba(124, 58, 237, 0.3);
 }
 
-/* 内容区块布局 */
+/* ===== 内容区域 ===== */
 .siliconflow-extension-settings .inline-drawer-content {
-    padding: 20px;
+    padding: 24px;
     display: flex;
     flex-direction: column;
-    gap: 16px;
+    gap: 20px;
+    background: linear-gradient(180deg,
+        rgba(0, 0, 0, 0.1) 0%,
+        transparent 100%
+    );
 }
 
-/* 设置项通用样式 */
-.siliconflow-extension-settings .setting-item {
+/* ===== 表单元素基础 ===== */
+.siliconflow-extension-settings .flex-container {
     display: flex;
-    flex-direction: column;
-    gap: 6px;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 12px;
 }
 
-.siliconflow-extension-settings .setting-item label {
-    font-size: 0.9em;
+.siliconflow-extension-settings label:not(.checkbox_label) {
+    font-size: 0.875em;
     font-weight: 500;
-    opacity: 0.9;
+    color: var(--sf-text-secondary);
+    min-width: 100px;
+    letter-spacing: 0.01em;
 }
 
-/* 输入框与下拉框美化 */
+/* ===== 输入框美化 ===== */
 .siliconflow-extension-settings input[type="text"],
 .siliconflow-extension-settings input[type="password"],
 .siliconflow-extension-settings input[type="number"],
-.siliconflow-extension-settings select,
 .siliconflow-extension-settings textarea {
-    background: rgba(0, 0, 0, 0.2) !important;
-    border: 1px solid rgba(255, 255, 255, 0.1) !important;
-    border-radius: 8px !important;
-    padding: 10px 12px !important;
-    color: var(--SmartThemeBodyColor) !important;
-    transition: all 0.2s ease;
-    width: 100%;
-    box-sizing: border-box;
+    background: rgba(0, 0, 0, 0.35) !important;
+    border: 1px solid var(--sf-glass-border) !important;
+    border-radius: var(--sf-radius-sm) !important;
+    padding: 12px 16px !important;
+    color: var(--sf-text-primary) !important;
+    font-size: 0.95em !important;
+    transition: all 0.25s ease !important;
+    box-shadow: inset 0 2px 4px rgba(0, 0, 0, 0.1);
 }
 
-.siliconflow-extension-settings input:focus, 
+.siliconflow-extension-settings input[type="text"]:hover,
+.siliconflow-extension-settings input[type="password"]:hover,
+.siliconflow-extension-settings textarea:hover {
+    border-color: rgba(255, 255, 255, 0.2) !important;
+    background: rgba(0, 0, 0, 0.4) !important;
+}
+
+.siliconflow-extension-settings input:focus,
+.siliconflow-extension-settings textarea:focus {
+    border-color: var(--sf-primary) !important;
+    box-shadow:
+        0 0 0 3px rgba(124, 58, 237, 0.15),
+        inset 0 2px 4px rgba(0, 0, 0, 0.1) !important;
+    outline: none !important;
+    background: rgba(0, 0, 0, 0.45) !important;
+}
+
+.siliconflow-extension-settings input::placeholder {
+    color: rgba(255, 255, 255, 0.3);
+    font-style: italic;
+}
+
+/* ===== 下拉框美化 ===== */
+.siliconflow-extension-settings select {
+    background: rgba(0, 0, 0, 0.35) !important;
+    border: 1px solid var(--sf-glass-border) !important;
+    border-radius: var(--sf-radius-sm) !important;
+    padding: 12px 40px 12px 16px !important;
+    color: var(--sf-text-primary) !important;
+    font-size: 0.95em !important;
+    cursor: pointer;
+    appearance: none;
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 12 12'%3E%3Cpath fill='%23888' d='M6 8L1 3h10z'/%3E%3C/svg%3E") !important;
+    background-repeat: no-repeat !important;
+    background-position: right 14px center !important;
+    transition: all 0.25s ease !important;
+}
+
+.siliconflow-extension-settings select:hover {
+    border-color: rgba(255, 255, 255, 0.2) !important;
+}
+
 .siliconflow-extension-settings select:focus {
-    border-color: var(--SmartThemeQuoteColor, #7851ff) !important;
-    box-shadow: 0 0 0 2px rgba(120, 81, 255, 0.2);
-    outline: none;
+    border-color: var(--sf-primary) !important;
+    box-shadow: 0 0 0 3px rgba(124, 58, 237, 0.15) !important;
+    outline: none !important;
 }
 
-/* 滑块样式 (Range) */
+.siliconflow-extension-settings select option,
+.siliconflow-extension-settings select optgroup {
+    background: #1a1a2e;
+    color: var(--sf-text-primary);
+    padding: 10px;
+}
+
+/* ===== 滑块美化 ===== */
 .siliconflow-extension-settings input[type="range"] {
     -webkit-appearance: none;
+    appearance: none;
     height: 6px;
     background: rgba(255, 255, 255, 0.1);
-    border-radius: 5px;
-    margin: 15px 0;
+    border-radius: 10px;
+    margin: 12px 0;
+    position: relative;
+    flex: 1;
+}
+
+.siliconflow-extension-settings input[type="range"]::-webkit-slider-runnable-track {
+    height: 6px;
+    border-radius: 10px;
+    background: linear-gradient(90deg,
+        var(--sf-primary) 0%,
+        var(--sf-primary-light) 100%
+    );
 }
 
 .siliconflow-extension-settings input[type="range"]::-webkit-slider-thumb {
     -webkit-appearance: none;
-    width: 18px;
-    height: 18px;
+    width: 20px;
+    height: 20px;
     border-radius: 50%;
-    background: var(--SmartThemeQuoteColor, #7851ff);
+    background: linear-gradient(145deg, #fff, #e0e0e0);
     cursor: pointer;
-    box-shadow: 0 0 10px rgba(0,0,0,0.3);
+    box-shadow:
+        0 2px 8px rgba(0, 0, 0, 0.3),
+        0 0 0 3px rgba(124, 58, 237, 0.2);
+    margin-top: -7px;
+    transition: all 0.2s ease;
 }
 
-/* 按钮组与按钮美化 */
-.siliconflow-extension-settings .button-group {
-    display: flex;
-    flex-wrap: wrap;
-    gap: 10px;
+.siliconflow-extension-settings input[type="range"]::-webkit-slider-thumb:hover {
+    transform: scale(1.15);
+    box-shadow:
+        0 4px 12px rgba(0, 0, 0, 0.4),
+        0 0 0 4px rgba(124, 58, 237, 0.3),
+        var(--sf-shadow-glow);
 }
 
+.siliconflow-extension-settings input[type="range"]::-webkit-slider-thumb:active {
+    transform: scale(1.05);
+}
+
+/* 滑块数值显示 */
+.siliconflow-extension-settings span[id$="_value"] {
+    min-width: 45px;
+    text-align: center;
+    font-weight: 600;
+    font-size: 0.9em;
+    background: rgba(124, 58, 237, 0.2);
+    padding: 6px 10px;
+    border-radius: var(--sf-radius-sm);
+    color: var(--sf-primary-light);
+}
+
+/* ===== 按钮美化 ===== */
 .siliconflow-extension-settings .menu_button {
-    background: var(--SmartThemeQuoteColor, #7851ff) !important;
+    background: linear-gradient(135deg,
+        var(--sf-primary) 0%,
+        var(--sf-primary-dark) 100%
+    ) !important;
     color: white !important;
     border: none !important;
-    border-radius: 8px !important;
-    padding: 8px 16px !important;
-    font-weight: 500 !important;
-    transition: all 0.2s ease !important;
-    cursor: pointer;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    gap: 6px;
+    border-radius: var(--sf-radius-sm) !important;
+    padding: 10px 20px !important;
+    font-weight: 600 !important;
+    font-size: 0.9em !important;
+    letter-spacing: 0.02em !important;
+    cursor: pointer !important;
+    transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1) !important;
+    display: inline-flex !important;
+    align-items: center !important;
+    justify-content: center !important;
+    gap: 8px !important;
+    position: relative;
+    overflow: hidden;
+    box-shadow: 0 4px 12px rgba(124, 58, 237, 0.25);
+}
+
+.siliconflow-extension-settings .menu_button::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: -100%;
+    width: 100%;
+    height: 100%;
+    background: linear-gradient(90deg,
+        transparent,
+        rgba(255, 255, 255, 0.2),
+        transparent
+    );
+    transition: left 0.5s ease;
 }
 
 .siliconflow-extension-settings .menu_button:hover {
-    filter: brightness(1.2);
-    transform: translateY(-1px);
-    box-shadow: 0 4px 12px rgba(0,0,0,0.2);
+    transform: translateY(-2px) !important;
+    box-shadow:
+        0 6px 20px rgba(124, 58, 237, 0.35),
+        var(--sf-shadow-glow) !important;
+}
+
+.siliconflow-extension-settings .menu_button:hover::before {
+    left: 100%;
 }
 
 .siliconflow-extension-settings .menu_button:active {
-    transform: translateY(0);
+    transform: translateY(0) scale(0.98) !important;
 }
 
-/* 特殊按钮：删除 */
+/* 删除按钮特殊样式 */
 .siliconflow-extension-settings .delete-voice {
-    background: #ff4d4f !important;
+    background: linear-gradient(135deg,
+        var(--sf-danger) 0%,
+        #dc2626 100%
+    ) !important;
+    padding: 6px 14px !important;
+    font-size: 0.8em !important;
+    box-shadow: 0 4px 12px rgba(239, 68, 68, 0.25);
 }
 
-/* 子分区卡片 */
-.siliconflow-extension-settings .sub-section {
-    background: rgba(255, 255, 255, 0.03);
-    border-radius: 10px;
-    padding: 15px;
-    border: 1px dashed rgba(255, 255, 255, 0.1);
+.siliconflow-extension-settings .delete-voice:hover {
+    box-shadow:
+        0 6px 20px rgba(239, 68, 68, 0.35),
+        0 0 20px rgba(239, 68, 68, 0.3) !important;
 }
 
-.siliconflow-extension-settings .sub-section h4 {
-    margin: 0 0 12px 0;
+/* ===== 复选框美化 ===== */
+.siliconflow-extension-settings .checkbox_label {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    cursor: pointer;
+    padding: 8px 12px;
+    border-radius: var(--sf-radius-sm);
+    transition: background 0.2s ease;
+    user-select: none;
+}
+
+.siliconflow-extension-settings .checkbox_label:hover {
+    background: rgba(255, 255, 255, 0.05);
+}
+
+.siliconflow-extension-settings .checkbox_label input[type="checkbox"] {
+    appearance: none;
+    -webkit-appearance: none;
+    width: 22px;
+    height: 22px;
+    border: 2px solid rgba(255, 255, 255, 0.2);
+    border-radius: 6px;
+    background: rgba(0, 0, 0, 0.2);
+    cursor: pointer;
+    position: relative;
+    transition: all 0.25s ease;
+}
+
+.siliconflow-extension-settings .checkbox_label input[type="checkbox"]:checked {
+    background: var(--sf-primary);
+    border-color: var(--sf-primary);
+    box-shadow: 0 0 12px rgba(124, 58, 237, 0.4);
+}
+
+.siliconflow-extension-settings .checkbox_label input[type="checkbox"]:checked::after {
+    content: '✓';
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    color: white;
+    font-size: 14px;
+    font-weight: bold;
+}
+
+.siliconflow-extension-settings .checkbox_label span {
+    font-size: 0.95em;
+    color: var(--sf-text-primary);
+}
+
+/* ===== 状态标签 ===== */
+#connection_status {
+    font-size: 0.8em;
+    font-weight: 600;
+    padding: 5px 12px;
+    border-radius: 20px;
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+}
+
+#connection_status[style*="green"] {
+    background: rgba(16, 185, 129, 0.2) !important;
+    color: var(--sf-success) !important;
+    border: 1px solid rgba(16, 185, 129, 0.3);
+}
+
+#connection_status::before {
+    content: '';
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    background: currentColor;
+    animation: pulse 2s infinite;
+}
+
+@keyframes pulse {
+    0%, 100% { opacity: 1; }
+    50% { opacity: 0.5; }
+}
+
+#model_test_status {
+    font-size: 0.85em;
+    font-weight: 500;
+    padding: 4px 10px;
+    border-radius: 6px;
+}
+
+/* ===== 分割线 ===== */
+.siliconflow-extension-settings hr {
+    border: none;
+    height: 1px;
+    background: linear-gradient(90deg,
+        transparent,
+        rgba(255, 255, 255, 0.1) 20%,
+        rgba(255, 255, 255, 0.1) 80%,
+        transparent
+    );
+    margin: 8px 0;
+}
+
+/* ===== 子区块标题 ===== */
+.siliconflow-extension-settings b:not(.inline-drawer-header b) {
+    display: flex;
+    align-items: center;
+    gap: 10px;
     font-size: 1em;
+    color: var(--sf-text-primary);
+    margin-bottom: 12px;
+    padding-bottom: 8px;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+}
+
+.siliconflow-extension-settings b:not(.inline-drawer-header b)::before {
+    content: '';
+    width: 4px;
+    height: 18px;
+    background: linear-gradient(180deg, var(--sf-primary), var(--sf-primary-light));
+    border-radius: 2px;
+}
+
+/* ===== 自定义音色列表 ===== */
+#custom_voices_list {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    max-height: 180px;
+    overflow-y: auto;
+    padding-right: 8px;
+}
+
+#custom_voices_list::-webkit-scrollbar {
+    width: 6px;
+}
+
+#custom_voices_list::-webkit-scrollbar-track {
+    background: rgba(0, 0, 0, 0.1);
+    border-radius: 3px;
+}
+
+#custom_voices_list::-webkit-scrollbar-thumb {
+    background: rgba(255, 255, 255, 0.15);
+    border-radius: 3px;
+}
+
+#custom_voices_list::-webkit-scrollbar-thumb:hover {
+    background: rgba(255, 255, 255, 0.25);
+}
+
+.siliconflow-extension-settings .custom-voice-item {
+    background: rgba(0, 0, 0, 0.2) !important;
+    border: 1px solid var(--sf-glass-border) !important;
+    border-radius: var(--sf-radius-sm) !important;
+    padding: 12px 16px !important;
+    margin: 0 !important;
+    display: flex !important;
+    align-items: center !important;
+    justify-content: space-between !important;
+    transition: all 0.2s ease;
+}
+
+.siliconflow-extension-settings .custom-voice-item:hover {
+    background: rgba(0, 0, 0, 0.3) !important;
+    border-color: rgba(255, 255, 255, 0.15) !important;
+}
+
+.siliconflow-extension-settings .custom-voice-item span {
     display: flex;
     align-items: center;
     gap: 8px;
 }
 
-.siliconflow-extension-settings .sub-section h4::before {
-    content: '';
-    width: 4px;
-    height: 16px;
-    background: var(--SmartThemeQuoteColor, #7851ff);
-    border-radius: 2px;
+.siliconflow-extension-settings .custom-voice-item span::before {
+    content: '🎤';
+    font-size: 1.1em;
 }
 
-/* 状态标签 */
-#connection_status {
-    font-size: 0.85em;
-    padding: 2px 8px;
-    border-radius: 4px;
-    background: rgba(0,0,0,0.2);
-}
-
-/* 自定义音色列表项 */
-#custom_voices_list div {
-    background: rgba(0,0,0,0.1);
-    border-radius: 6px;
-    padding: 8px 12px !important;
-    border: 1px solid rgba(255,255,255,0.05);
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    margin-bottom: 8px !important;
-}
-
-/* 提示文本 */
+/* ===== 提示文本 ===== */
 .siliconflow-extension-settings small {
-    color: opacity: 0.6;
-    line-height: 1.4;
-    font-style: italic;
+    color: var(--sf-text-secondary);
+    font-size: 0.8em;
+    line-height: 1.5;
+    display: block;
 }
 
-/* 这里的分割线更淡一些 */
-.siliconflow-extension-settings hr.sysHR {
-    border: 0;
-    border-top: 1px solid rgba(255,255,255,0.08);
-    margin: 10px 0;
+/* ===== 文件上传美化 ===== */
+.siliconflow-extension-settings input[type="file"] {
+    color: var(--sf-text-secondary);
+    font-size: 0.9em;
+}
+
+.siliconflow-extension-settings input[type="file"]::file-selector-button {
+    background: linear-gradient(135deg,
+        rgba(124, 58, 237, 0.3) 0%,
+        rgba(124, 58, 237, 0.15) 100%
+    );
+    color: var(--sf-text-primary);
+    border: 1px solid rgba(124, 58, 237, 0.4);
+    border-radius: var(--sf-radius-sm);
+    padding: 8px 16px;
+    margin-right: 12px;
+    cursor: pointer;
+    font-weight: 500;
+    transition: all 0.25s ease;
+}
+
+.siliconflow-extension-settings input[type="file"]::file-selector-button:hover {
+    background: linear-gradient(135deg,
+        rgba(124, 58, 237, 0.4) 0%,
+        rgba(124, 58, 237, 0.25) 100%
+    );
+    border-color: var(--sf-primary);
+}
+
+/* ===== TTS输出区域 ===== */
+#tts_output {
+    padding: 12px;
+    background: rgba(0, 0, 0, 0.2);
+    border-radius: var(--sf-radius-sm);
+    min-height: 40px;
+}
+
+#tts_output a {
+    color: var(--sf-primary-light);
+    text-decoration: none;
+    font-weight: 500;
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    padding: 8px 16px;
+    background: rgba(124, 58, 237, 0.15);
+    border-radius: var(--sf-radius-sm);
+    transition: all 0.2s ease;
+}
+
+#tts_output a::before {
+    content: '⬇️';
+}
+
+#tts_output a:hover {
+    background: rgba(124, 58, 237, 0.25);
+    color: white;
+}
+
+/* ===== 动画效果 ===== */
+@keyframes fadeIn {
+    from { opacity: 0; transform: translateY(-10px); }
+    to { opacity: 1; transform: translateY(0); }
+}
+
+.siliconflow-extension-settings .inline-drawer-content > * {
+    animation: fadeIn 0.3s ease forwards;
+}
+
+.siliconflow-extension-settings .inline-drawer-content > *:nth-child(2) { animation-delay: 0.05s; }
+.siliconflow-extension-settings .inline-drawer-content > *:nth-child(3) { animation-delay: 0.1s; }
+.siliconflow-extension-settings .inline-drawer-content > *:nth-child(4) { animation-delay: 0.15s; }
+.siliconflow-extension-settings .inline-drawer-content > *:nth-child(5) { animation-delay: 0.2s; }
+
+/* ===== 响应式适配 ===== */
+@media (max-width: 600px) {
+    .siliconflow-extension-settings .flex-container {
+        flex-direction: column;
+        align-items: stretch;
+    }
+
+    .siliconflow-extension-settings label:not(.checkbox_label) {
+        min-width: unset;
+    }
+
+    .siliconflow-extension-settings .menu_button {
+        width: 100%;
+    }
 }
