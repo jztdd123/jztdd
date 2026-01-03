@@ -19,7 +19,6 @@ const defaultSettings = {
   apiKey: "",
   apiUrl: "https://api.siliconflow.cn/v1",
   ttsModel: "FunAudioLLM/CosyVoice2-0.5B",
-  cachedModels: [], // 缓存的模型列表
   ttsVoice: "alex",
   ttsSpeed: 1.0,
   ttsGain: 0,
@@ -27,24 +26,30 @@ const defaultSettings = {
   sampleRate: 32000,
   imageModel: "",
   imageSize: "512",
-  textStart: "", // 默认为空，不开启截取
-  textEnd: "",
+  textStart: "“",
+  textEnd: "”",
+  excludeRegex: "", // 存储排除正则
   generationFrequency: 5,
   autoPlay: true,
   autoPlayUser: false,
-  customVoices: [] 
+  customVoices: [] // 存储自定义音色列表
 };
 
-// 通用预设音色列表
-const COMMON_VOICES = {
-  "alex": "Alex (CosyVoice专用)",
-  "anna": "Anna (CosyVoice专用)",
-  "bella": "Bella (CosyVoice专用)",
-  "benjamin": "Benjamin (CosyVoice专用)",
-  "charles": "Charles (CosyVoice专用)",
-  "claire": "Claire (CosyVoice专用)",
-  "david": "David (CosyVoice专用)",
-  "diana": "Diana (CosyVoice专用)"
+// TTS模型和音色配置 (保留原版结构)
+const TTS_MODELS = {
+  "FunAudioLLM/CosyVoice2-0.5B": {
+    name: "CosyVoice2-0.5B",
+    voices: {
+      "alex": "Alex (男声)",
+      "anna": "Anna (女声)",
+      "bella": "Bella (女声)",
+      "benjamin": "Benjamin (男声)",
+      "charles": "Charles (男声)",
+      "claire": "Claire (女声)",
+      "david": "David (男声)",
+      "diana": "Diana (女声)"
+    }
+  }
 };
 
 // 加载设置
@@ -55,137 +60,47 @@ async function loadSettings() {
     Object.assign(extension_settings[extensionName], defaultSettings);
   }
 
-  // UI 赋值
+  // 更新UI
   $("#siliconflow_api_key").val(extension_settings[extensionName].apiKey || "");
   $("#siliconflow_api_url").val(extension_settings[extensionName].apiUrl || defaultSettings.apiUrl);
-  
-  // 恢复模型列表
-  updateModelSelect(extension_settings[extensionName].cachedModels || []);
-  
-  // 设置选中的模型
-  const savedModel = extension_settings[extensionName].ttsModel || defaultSettings.ttsModel;
-  if ($(`#tts_model option[value="${savedModel}"]`).length === 0) {
-    $("#tts_model").append(new Option(savedModel, savedModel));
-  }
-  $("#tts_model").val(savedModel);
-
-  // 其他数值设置
+  $("#tts_model").val(extension_settings[extensionName].ttsModel || defaultSettings.ttsModel);
+  $("#tts_voice").val(extension_settings[extensionName].ttsVoice || defaultSettings.ttsVoice);
   $("#tts_speed").val(extension_settings[extensionName].ttsSpeed || defaultSettings.ttsSpeed);
   $("#tts_speed_value").text(extension_settings[extensionName].ttsSpeed || defaultSettings.ttsSpeed);
   $("#tts_gain").val(extension_settings[extensionName].ttsGain || defaultSettings.ttsGain);
   $("#tts_gain_value").text(extension_settings[extensionName].ttsGain || defaultSettings.ttsGain);
   $("#image_text_start").val(extension_settings[extensionName].textStart || defaultSettings.textStart);
   $("#image_text_end").val(extension_settings[extensionName].textEnd || defaultSettings.textEnd);
+  $("#tts_exclude_regex").val(extension_settings[extensionName].excludeRegex || ""); // 加载排除正则
+  
   $("#auto_play_audio").prop("checked", extension_settings[extensionName].autoPlay !== false);
   $("#auto_play_user").prop("checked", extension_settings[extensionName].autoPlayUser === true);
   
-  // 更新音色列表
-  updateVoiceOptions(extension_settings[extensionName].ttsVoice || defaultSettings.ttsVoice);
-}
-
-// 辅助函数：更新模型下拉框
-function updateModelSelect(models) {
-    const $select = $("#tts_model");
-    const currentVal = $select.val();
-    
-    if (!models || models.length === 0) return;
-
-    $select.empty();
-    
-    let hasCosy = false;
-    models.forEach(modelId => {
-        $select.append(new Option(modelId, modelId));
-        if (modelId === "FunAudioLLM/CosyVoice2-0.5B") hasCosy = true;
-    });
-
-    if (!hasCosy && models.length === 0) {
-        $select.append(new Option("FunAudioLLM/CosyVoice2-0.5B", "FunAudioLLM/CosyVoice2-0.5B"));
-    }
-
-    if (currentVal && models.includes(currentVal)) {
-        $select.val(currentVal);
-    } else if ($select.find('option').length > 0) {
-        $select.val($select.find('option:first').val());
-    }
-}
-
-// 获取远程模型列表
-async function fetchRemoteModels() {
-    const apiKey = $("#siliconflow_api_key").val();
-    const apiUrl = $("#siliconflow_api_url").val();
-    const $btn = $("#refresh_models");
-    const $icon = $btn.find("i");
-
-    if (!apiKey) {
-        toastr.error("请先输入API密钥", "获取模型失败");
-        return;
-    }
-
-    try {
-        $icon.addClass("fa-spin");
-        
-        let endpoint = apiUrl;
-        if (endpoint.endsWith("/")) endpoint = endpoint.slice(0, -1);
-        if (!endpoint.endsWith("/models")) {
-             endpoint = `${endpoint}/models`;
-        }
-
-        console.log(`正在从 ${endpoint} 获取模型列表...`);
-
-        const response = await fetch(endpoint, {
-            method: 'GET',
-            headers: {
-                'Authorization': `Bearer ${apiKey}`,
-                'Content-Type': 'application/json'
-            }
-        });
-
-        if (!response.ok) {
-            throw new Error(`HTTP ${response.status}`);
-        }
-
-        const data = await response.json();
-        const modelList = data.data || data.models || [];
-        
-        if (modelList.length === 0) {
-            toastr.warning("API返回了空模型列表", "获取模型");
-            return;
-        }
-
-        const modelIds = modelList.map(m => m.id).sort();
-        
-        extension_settings[extensionName].cachedModels = modelIds;
-        saveSettingsDebounced();
-
-        updateModelSelect(modelIds);
-        toastr.success(`成功获取 ${modelIds.length} 个模型`, "获取成功");
-
-    } catch (error) {
-        console.error("Fetch Models Error:", error);
-        toastr.error(`获取模型失败: ${error.message}`, "错误");
-    } finally {
-        $icon.removeClass("fa-spin");
-    }
+  updateVoiceOptions();
 }
 
 // 更新音色选项
-function updateVoiceOptions(targetVoice = null) {
+function updateVoiceOptions() {
+  const model = $("#tts_model").val();
   const voiceSelect = $("#tts_voice");
-  let voiceToSelect = targetVoice || voiceSelect.val() || extension_settings[extensionName].ttsVoice || "alex";
-  
+  const currentValue = voiceSelect.val();
   voiceSelect.empty();
   
-  // 添加通用预设音色
-  voiceSelect.append('<optgroup label="预设音色 (仅限CosyVoice模型)">');
-  Object.entries(COMMON_VOICES).forEach(([value, name]) => {
-    voiceSelect.append(`<option value="${value}">${name}</option>`);
-  });
-  voiceSelect.append('</optgroup>');
+  // 添加预设音色
+  if (TTS_MODELS[model] && TTS_MODELS[model].voices) {
+    voiceSelect.append('<optgroup label="预设音色">');
+    Object.entries(TTS_MODELS[model].voices).forEach(([value, name]) => {
+      voiceSelect.append(`<option value="${value}">${name}</option>`);
+    });
+    voiceSelect.append('</optgroup>');
+  }
   
   // 添加自定义音色
   const customVoices = extension_settings[extensionName].customVoices || [];
+  console.log(`更新音色选项，自定义音色数量: ${customVoices.length}`);
+  
   if (customVoices.length > 0) {
-    voiceSelect.append('<optgroup label="自定义音色 (适用于所有模型)">');
+    voiceSelect.append('<optgroup label="自定义音色">');
     customVoices.forEach(voice => {
       const voiceName = voice.name || voice.customName || voice.custom_name || "未命名";
       const voiceUri = voice.uri || voice.id || voice.voice_id;
@@ -194,11 +109,11 @@ function updateVoiceOptions(targetVoice = null) {
     voiceSelect.append('</optgroup>');
   }
   
-  voiceSelect.val(voiceToSelect);
-  if (!voiceSelect.val()) {
-      voiceSelect.val("alex");
+  if (currentValue && voiceSelect.find(`option[value="${currentValue}"]`).length > 0) {
+    voiceSelect.val(currentValue);
+  } else {
+    voiceSelect.val(extension_settings[extensionName].ttsVoice || Object.keys(TTS_MODELS[model]?.voices || {})[0]);
   }
-  extension_settings[extensionName].ttsVoice = voiceSelect.val();
 }
 
 // 保存设置
@@ -211,6 +126,7 @@ function saveSettings() {
   extension_settings[extensionName].ttsGain = parseFloat($("#tts_gain").val());
   extension_settings[extensionName].textStart = $("#image_text_start").val();
   extension_settings[extensionName].textEnd = $("#image_text_end").val();
+  extension_settings[extensionName].excludeRegex = $("#tts_exclude_regex").val();
   extension_settings[extensionName].autoPlay = $("#auto_play_audio").prop("checked");
   extension_settings[extensionName].autoPlayUser = $("#auto_play_user").prop("checked");
   
@@ -226,17 +142,13 @@ async function testConnection() {
     return;
   }
   try {
-    $("#connection_status").text("连接中...").css("color", "orange");
     const response = await fetch(`${extension_settings[extensionName].apiUrl}/audio/voice/list`, {
       method: 'GET',
-      headers: {
-        'Authorization': `Bearer ${apiKey}`,
-        'Content-Type': 'application/json'
-      }
+      headers: { 'Authorization': `Bearer ${apiKey}`, 'Content-Type': 'application/json' }
     });
     if (response.ok) {
       $("#connection_status").text("已连接").css("color", "green");
-      toastr.success("API连接成功", "系统消息");
+      console.log("API连接成功");
     } else {
       throw new Error(`HTTP ${response.status}`);
     }
@@ -246,47 +158,33 @@ async function testConnection() {
   }
 }
 
-// TTS生成功能
+// TTS功能
 async function generateTTS(text) {
   const apiKey = extension_settings[extensionName].apiKey;
-  const apiUrl = extension_settings[extensionName].apiUrl;
-  const model = $("#tts_model").val();
-
-  if (!apiKey) {
-    toastr.error("请先配置API密钥", "TTS错误");
-    return;
-  }
-  if (!text || text.trim().length === 0) {
-    console.log("TTS文本为空，跳过生成");
-    return;
-  }
-  if (audioState.isPlaying) {
-    console.log('音频正在处理中，跳过此次请求');
-    return;
-  }
+  if (!apiKey) { toastr.error("请先配置API密钥", "TTS错误"); return; }
+  if (!text || text.trim().length === 0) return;
+  if (audioState.isPlaying) { console.log('音频处理中，跳过'); return; }
   
-  // 开始处理弹窗
-  const processingToast = toastr.info("正在合成语音并加载...", "硅基流动", { timeOut: 3000 });
+  // 新增弹窗提示
+  toastr.info("正在合成语音并加载...", "硅基流动", { timeOut: 2000 });
   
   try {
     audioState.isPlaying = true;
-    console.log(`正在生成语音... 模型: ${model}`);
+    console.log("正在生成语音...");
     
     const voiceValue = $("#tts_voice").val() || "alex";
     const speed = parseFloat($("#tts_speed").val()) || 1.0;
     const gain = parseFloat($("#tts_gain").val()) || 0;
     
     let voiceParam;
-    if (voiceValue.startsWith("speech:") || voiceValue.includes("/")) {
+    if (voiceValue.includes("/") || voiceValue.startsWith("speech:")) {
       voiceParam = voiceValue;
-    } else if (model === "FunAudioLLM/CosyVoice2-0.5B") {
-      voiceParam = `${model}:${voiceValue}`;
     } else {
-      voiceParam = voiceValue;
+      voiceParam = `FunAudioLLM/CosyVoice2-0.5B:${voiceValue}`;
     }
     
     const requestBody = {
-      model: model,
+      model: "FunAudioLLM/CosyVoice2-0.5B",
       input: text,
       voice: voiceParam,
       response_format: "mp3",
@@ -294,7 +192,9 @@ async function generateTTS(text) {
       gain: gain
     };
     
-    const response = await fetch(`${apiUrl}/audio/speech`, {
+    console.log('TTS请求参数:', requestBody);
+    
+    const response = await fetch(`${extension_settings[extensionName].apiUrl}/audio/speech`, {
       method: 'POST',
       headers: {
         'Authorization': `Bearer ${apiKey}`,
@@ -303,37 +203,25 @@ async function generateTTS(text) {
       body: JSON.stringify(requestBody)
     });
     
-    if (!response.ok) {
-      throw new Error(`HTTP ${response.status}: ${await response.text()}`);
-    }
+    if (!response.ok) throw new Error(`HTTP ${response.status}: ${await response.text()}`);
     
     const audioBlob = await response.blob();
     const audioUrl = URL.createObjectURL(audioBlob);
     const audio = new Audio(audioUrl);
     
     if (extension_settings[extensionName].autoPlay) {
-      audio.addEventListener('ended', () => { 
-        audioState.isPlaying = false; 
-        URL.revokeObjectURL(audioUrl);
-      });
-      audio.addEventListener('error', () => { 
-        audioState.isPlaying = false; 
-        toastr.error("音频播放失败", "错误");
-      });
-      audio.play().catch(err => {
-        audioState.isPlaying = false;
-        console.error('播放失败:', err);
-      });
+      audioState.isPlaying = true;
+      audio.addEventListener('ended', () => { audioState.isPlaying = false; URL.revokeObjectURL(audioUrl); });
+      audio.addEventListener('error', () => { audioState.isPlaying = false; });
+      audio.play().catch(err => { audioState.isPlaying = false; console.error('播放失败:', err); });
     } else {
-        audioState.isPlaying = false;
+      audioState.isPlaying = false;
     }
     
     const downloadLink = $(`<a href="${audioUrl}" download="tts_output.mp3">下载音频</a>`);
     $("#tts_output").empty().append(downloadLink);
-    
     console.log("语音生成成功！");
     return audioUrl;
-
   } catch (error) {
     console.error("TTS Error:", error);
     toastr.error(`语音生成失败: ${error.message}`, "TTS错误");
@@ -341,268 +229,262 @@ async function generateTTS(text) {
   }
 }
 
-// 提取文本的辅助函数
-function extractTextWithMarkers(text, startMarkersStr, endMarkersStr) {
-    if (!startMarkersStr || !endMarkersStr) return text;
-
-    const startArr = startMarkersStr.split(/[,，]/).map(s => s.trim()).filter(s => s);
-    const endArr = endMarkersStr.split(/[,，]/).map(s => s.trim()).filter(s => s);
-
-    if (startArr.length === 0 || endArr.length === 0) return text;
-
-    let extractedParts = [];
-    let hasMatch = false;
-    const escapeRegex = (str) => str.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-    const patterns = [];
-    const minLen = Math.min(startArr.length, endArr.length);
+// 新增文本清洗逻辑
+function getCleanText(messageElement) {
+    const $clone = messageElement.find('.mes_text').clone();
     
-    for (let i = 0; i < minLen; i++) {
-        const s = escapeRegex(startArr[i]);
-        const e = escapeRegex(endArr[i]);
-        patterns.push(`${s}(.*?)${e}`);
+    // 物理剔除 HTML 干扰
+    $clone.find('pre, code, script, style, details, .summary, .message_summary, .st-ui, .st_internal, [class*="mujica"]').remove();
+    
+    let text = $clone.text().trim();
+
+    // 应用自定义排除正则
+    const excludePattern = $("#tts_exclude_regex").val();
+    if (excludePattern) {
+        try {
+            const regexMatch = excludePattern.match(/^\/(.*?)\/([gimy]*)$/);
+            const regex = regexMatch ? new RegExp(regexMatch[1], regexMatch[2]) : new RegExp(excludePattern, 'g');
+            text = text.replace(regex, '');
+        } catch (e) { console.error("排除正则错误:", e); }
     }
     
-    if (patterns.length === 0) return text;
-
-    const combinedRegex = new RegExp(patterns.join('|'), 'g');
-    const matches = text.matchAll(combinedRegex);
-    for (const match of matches) {
-        hasMatch = true;
-        let content = match[0];
-        for (let i = 0; i < minLen; i++) {
-             if (content.startsWith(startArr[i]) && content.endsWith(endArr[i])) {
-                 content = content.substring(startArr[i].length);
-                 content = content.substring(0, content.length - endArr[i].length);
-                 break;
-             }
-        }
-        extractedParts.push(content.trim());
-    }
-
-    if (hasMatch && extractedParts.length > 0) {
-        return extractedParts.join(' ');
-    }
-    return text; 
+    return text.trim();
 }
 
-// 监听消息事件 (已优化触发稳定性)
+// 监听消息事件 (保留 900 行版的全调试日志)
 function setupMessageListener() {
-  // 角色消息触发逻辑优化
+  console.log('设置消息监听器');
+  console.log('事件类型:', event_types);
+  
   eventSource.on(event_types.CHARACTER_MESSAGE_RENDERED, async (messageId) => {
-    // 如果已经处理过这个 ID，跳过
+    console.log('角色消息渲染:', messageId);
     if (audioState.lastProcessedMessageId === messageId) return;
-    if (!$("#auto_play_audio").prop("checked")) return;
-
-    // 清除之前的定时器，防止流式输出频繁触发
+    
+    const autoPlay = $("#auto_play_audio").prop("checked");
+    if (!autoPlay) return;
+    
     if (audioState.processingTimeout) clearTimeout(audioState.processingTimeout);
     
-    // 设置稍长的延迟，确保“正文输出完毕”
     audioState.processingTimeout = setTimeout(() => {
+      console.log('延时处理开始:', messageId);
       const messageElement = $(`.mes[mesid="${messageId}"]`);
       
-      // 关键判断：如果消息还在生成中（sillytavern 标记），则继续等
-      if (messageElement.find('.typing-indicator, .dot-flashing').length > 0) {
-          console.log("消息仍在生成中，稍后再试...");
+      // 稳定性优化：检查是否还在生成中
+      if (messageElement.hasClass('streaming') || messageElement.find('.typing-indicator').length > 0) {
+          console.log("正文生成中，延迟重试...");
           eventSource.emit(event_types.CHARACTER_MESSAGE_RENDERED, messageId);
           return;
       }
 
       audioState.lastProcessedMessageId = messageId;
-      const message = messageElement.find('.mes_text').text();
       
-      if (!message || message.trim().length < 1) return;
+      // 使用清洗逻辑获取正文
+      const message = getCleanText(messageElement);
+      console.log('清洗后正文长度:', message ? message.length : 0);
+      
+      if (!message) return;
       
       const textStart = $("#image_text_start").val();
       const textEnd = $("#image_text_end").val();
-      const textToRead = extractTextWithMarkers(message, textStart, textEnd);
       
-      generateTTS(textToRead);
-    }, 1200); // 增加到1.2秒，避开最后一波渲染
+      if (textStart && textEnd) {
+        let extractedTexts = [];
+        // 保留原版“相同标记配对”逻辑
+        if (textStart === textEnd) {
+          let insideQuote = false;
+          let currentText = '';
+          for (let i = 0; i < message.length; i++) {
+            const char = message[i];
+            if (char === textStart) {
+              if (!insideQuote) { insideQuote = true; currentText = ''; } 
+              else { if (currentText.trim()) extractedTexts.push(currentText.trim()); insideQuote = false; }
+            } else if (insideQuote) {
+              currentText += char;
+            }
+          }
+        } else {
+          // 不同标记正则逻辑
+          const escapeRegex = (str) => str.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+          const regex = new RegExp(`${escapeRegex(textStart)}(.*?)${escapeRegex(textEnd)}`, 'g');
+          const matches = message.match(regex);
+          if (matches) {
+            matches.forEach(match => {
+              const clean = match.replace(textStart, '').replace(textEnd, '').trim();
+              if (clean) extractedTexts.push(clean);
+            });
+          }
+        }
+        
+        if (extractedTexts.length > 0) {
+          const finalText = extractedTexts.join(' ');
+          console.log('自动朗读标记内文本:', finalText);
+          generateTTS(finalText);
+          return;
+        }
+      } else {
+        console.log('未设置标记，自动朗读全文');
+        generateTTS(message);
+      }
+    }, 1200); 
   });
   
-  // 用户消息
+  // 用户消息监听 (同样保留调试日志)
   eventSource.on(event_types.USER_MESSAGE_RENDERED, async (messageId) => {
     if (audioState.lastProcessedUserMessageId === messageId) return;
-    if (!$("#auto_play_user").prop("checked")) return;
-    
+    const autoPlayUser = $("#auto_play_user").prop("checked");
+    if (!autoPlayUser) return;
     audioState.lastProcessedUserMessageId = messageId;
+    
     setTimeout(() => {
       const messageElement = $(`.mes[mesid="${messageId}"]`);
-      const message = messageElement.find('.mes_text').text();
+      const message = getCleanText(messageElement);
       if (message) generateTTS(message);
     }, 500);
   });
 }
 
-// 克隆音色功能
+// 克隆音色功能 (保留原版 JSON + FormData 双重逻辑)
 async function uploadVoice() {
   const apiKey = extension_settings[extensionName].apiKey;
-  const apiUrl = extension_settings[extensionName].apiUrl;
   const voiceName = $("#clone_voice_name").val();
   const voiceText = $("#clone_voice_text").val();
   const audioFile = $("#clone_voice_audio")[0].files[0];
   
   if (!apiKey || !voiceName || !voiceText || !audioFile) {
-    toastr.error("请填写完整信息", "克隆错误");
+    toastr.error("请填全信息", "克隆错误");
     return;
   }
   
-  try {
-    const reader = new FileReader();
-    reader.onload = async function(e) {
-      try {
-        const base64Audio = e.target.result;
-        const requestBody = {
-          model: 'FunAudioLLM/CosyVoice2-0.5B',
-          customName: voiceName,
-          text: voiceText,
-          audio: base64Audio
-        };
+  const reader = new FileReader();
+  reader.onload = async function(e) {
+    try {
+      const base64Audio = e.target.result;
+      const requestBody = {
+        model: 'FunAudioLLM/CosyVoice2-0.5B',
+        customName: voiceName,
+        text: voiceText,
+        audio: base64Audio
+      };
+      
+      console.log("尝试 JSON 方式上传...");
+      const response = await fetch(`${extension_settings[extensionName].apiUrl}/uploads/audio/voice`, {
+        method: 'POST',
+        headers: { 'Authorization': `Bearer ${apiKey}`, 'Content-Type': 'application/json' },
+        body: JSON.stringify(requestBody)
+      });
+      
+      if (!response.ok) {
+        console.log("JSON方式失败，尝试 FormData 方式...");
+        const formData = new FormData();
+        formData.append('model', 'FunAudioLLM/CosyVoice2-0.5B');
+        formData.append('customName', voiceName);
+        formData.append('text', voiceText);
         
-        toastr.info("正在上传音色...", "请稍候");
+        const base64Data = base64Audio.split(',')[1];
+        const byteCharacters = atob(base64Data);
+        const byteNumbers = new Array(byteCharacters.length);
+        for (let i = 0; i < byteCharacters.length; i++) byteNumbers[i] = byteCharacters.charCodeAt(i);
+        const blob = new Blob([new Uint8Array(byteNumbers)], {type: audioFile.type});
+        formData.append('audio', blob, audioFile.name);
         
-        const response = await fetch(`${apiUrl}/uploads/audio/voice`, {
+        const response2 = await fetch(`${extension_settings[extensionName].apiUrl}/uploads/audio/voice`, {
           method: 'POST',
-          headers: {
-            'Authorization': `Bearer ${apiKey}`,
-            'Content-Type': 'application/json'
-          },
-          body: JSON.stringify(requestBody)
+          headers: { 'Authorization': `Bearer ${apiKey}` },
+          body: formData
         });
-        
-        if (!response.ok) throw new Error(await response.text());
-        
-        toastr.success(`音色 "${voiceName}" 克隆成功！`, "克隆音色");
-        $("#clone_voice_name").val("");
-        await loadCustomVoices();
-        
-      } catch (error) {
-        toastr.error(`失败: ${error.message}`, "克隆错误");
+        if (!response2.ok) throw new Error(await response2.text());
       }
-    };
-    reader.readAsDataURL(audioFile);
-  } catch (error) {
-    console.error(error);
-  }
+      
+      toastr.success(`音色 "${voiceName}" 克隆成功！`);
+      await loadCustomVoices();
+    } catch (error) {
+      toastr.error(`克隆失败: ${error.message}`);
+    }
+  };
+  reader.readAsDataURL(audioFile);
 }
 
-// 加载自定义音色列表
+// 加载音色列表
 async function loadCustomVoices() {
   const apiKey = extension_settings[extensionName].apiKey;
   if (!apiKey) return;
-  
   try {
     const response = await fetch(`${extension_settings[extensionName].apiUrl}/audio/voice/list`, {
       method: 'GET',
-      headers: { 'Authorization': `Bearer ${apiKey}` }
+      headers: { 'Authorization': `Bearer ${apiKey}`, 'Content-Type': 'application/json' }
     });
-    
-    if (response.ok) {
-      const data = await response.json();
-      extension_settings[extensionName].customVoices = data.result || data.results || [];
-      updateCustomVoicesList();
-      updateVoiceOptions();
-    }
-  } catch (error) {
-    console.error("Load Custom Voices Error:", error);
-  }
+    if (!response.ok) throw new Error(`HTTP ${response.status}`);
+    const data = await response.json();
+    extension_settings[extensionName].customVoices = data.result || data.results || [];
+    updateCustomVoicesList();
+    updateVoiceOptions();
+  } catch (error) { console.error("加载自定义音色错误:", error); }
 }
 
-// 更新自定义音色UI
 function updateCustomVoicesList() {
   const customVoices = extension_settings[extensionName].customVoices || [];
   const listContainer = $("#custom_voices_list");
-  
-  if (customVoices.length === 0) {
-    listContainer.html("<small>暂无自定义音色</small>");
-    return;
-  }
-  
+  if (customVoices.length === 0) { listContainer.html("<small>暂无自定义音色</small>"); return; }
   let html = "";
   customVoices.forEach(voice => {
-    const name = voice.name || voice.customName || "未命名";
-    html += `
-      <div style="margin: 5px 0; padding: 5px; border: 1px solid rgba(255,255,255,0.1); border-radius:8px;">
-        <span>${name}</span>
-        <button class="menu_button delete-voice" data-uri="${voice.uri}" data-name="${name}" style="float: right; font-size: 11px; padding: 4px 8px;">删除</button>
+    const vName = voice.name || voice.customName || "未命名";
+    const vUri = voice.uri || voice.id || voice.voice_id;
+    html += `<div style="margin: 5px 0; padding: 8px; border: 1px solid rgba(255,255,255,0.1); border-radius: 8px; display: flex; justify-content: space-between; align-items: center;">
+        <span>${vName}</span>
+        <button class="menu_button delete-voice" data-uri="${vUri}" data-name="${vName}" style="font-size: 11px;">删除</button>
       </div>`;
   });
   listContainer.html(html);
 }
 
-// 删除自定义音色
 async function deleteCustomVoice(uri, name) {
   if (!confirm(`确定要删除音色 "${name}" 吗？`)) return;
-  
-  const apiKey = extension_settings[extensionName].apiKey;
   try {
     const response = await fetch(`${extension_settings[extensionName].apiUrl}/audio/voice/deletions`, {
       method: 'POST',
-      headers: { 'Authorization': `Bearer ${apiKey}`, 'Content-Type': 'application/json' },
+      headers: { 'Authorization': `Bearer ${extension_settings[extensionName].apiKey}`, 'Content-Type': 'application/json' },
       body: JSON.stringify({ uri: uri })
     });
-    
-    if (response.ok) {
-      toastr.success(`音色已删除`, "成功");
-      await loadCustomVoices();
-    }
-  } catch (error) {
-    toastr.error(`删除失败: ${error.message}`, "错误");
-  }
+    if (response.ok) { toastr.success(`音色已删除`); await loadCustomVoices(); }
+  } catch (error) { toastr.error(`删除失败: ${error.message}`); }
 }
 
-// 初始化
+// jQuery加载时初始化 (保留原版 900 行版的完整初始化绑定)
 jQuery(async () => {
   const settingsHtml = await $.get(`${extensionFolderPath}/example.html`);
   $("#extensions_settings").append(settingsHtml);
   
+  // 原版折叠逻辑修复
   setTimeout(() => {
-    $('.siliconflow-extension-settings .inline-drawer-toggle').on('click', function(e) {
+    $('.siliconflow-extension-settings .inline-drawer-toggle').each(function() {
+      $(this).off('click').on('click', function(e) {
         e.preventDefault(); e.stopPropagation();
-        const $content = $(this).next('.inline-drawer-content');
-        const $icon = $(this).find('.inline-drawer-icon');
-        if ($content.is(':visible')) { $content.hide(); $icon.removeClass('down'); }
+        const $header = $(this);
+        const $icon = $header.find('.inline-drawer-icon');
+        const $content = $header.next('.inline-drawer-content');
+        if ($content.is(':visible')) { $content.hide(); $icon.removeClass('down'); } 
         else { $content.show(); $icon.addClass('down'); }
+      });
     });
   }, 100);
   
   $("#save_siliconflow_settings").on("click", saveSettings);
-  $("#test_siliconflow_connection").on("click", testConnection);
-  $("#refresh_models").on("click", fetchRemoteModels);
-  
-  $("#siliconflow_api_url").on("change", function() {
-      extension_settings[extensionName].apiUrl = $(this).val();
-  });
-  
-  $("#tts_model").on("change", function() {
-      extension_settings[extensionName].ttsModel = $(this).val();
-      updateVoiceOptions();
-  });
-  
   $("#upload_voice").on("click", uploadVoice);
   $("#refresh_custom_voices").on("click", loadCustomVoices);
-  $(document).on("click", ".delete-voice", function() {
-    deleteCustomVoice($(this).data("uri"), $(this).data("name"));
-  });
-  
-  $("#test_tts").on("click", async function() {
-    extension_settings[extensionName].ttsVoice = $("#tts_voice").val();
-    await generateTTS($("#tts_test_text").val() || "测试语音");
-  });
-
+  $(document).on("click", ".delete-voice", function() { deleteCustomVoice($(this).data("uri"), $(this).data("name")); });
+  $("#test_siliconflow_connection").on("click", testConnection);
+  $("#tts_model").on("change", updateVoiceOptions);
   $("#tts_speed").on("input", function() { $("#tts_speed_value").text($(this).val()); });
   $("#tts_gain").on("input", function() { $("#tts_gain_value").text($(this).val()); });
-  
+  $("#test_tts").on("click", () => generateTTS($("#tts_test_text").val()));
+
+  // 自动化复选框和正则字段实时保存
   $("#auto_play_audio, #auto_play_user").on("change", saveSettings);
-  $("#image_text_start, #image_text_end").on("input", () => {
-      extension_settings[extensionName].textStart = $("#image_text_start").val();
-      extension_settings[extensionName].textEnd = $("#image_text_end").val();
-      saveSettingsDebounced();
-  });
+  $("#image_text_start, #image_text_end, #tts_exclude_regex").on("input", saveSettings);
 
   await loadSettings();
   await loadCustomVoices();
   setupMessageListener();
   
-  console.log("SiliconFlow Extension Loaded (jztdd)");
+  console.log("硅基流动插件 (jztdd) 完整版已加载");
 });
