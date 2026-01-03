@@ -265,7 +265,11 @@ async function generateTTS(text) {
     return;
   }
   
+  // 开始处理弹窗
+  const processingToast = toastr.info("正在合成语音并加载...", "硅基流动", { timeOut: 3000 });
+  
   try {
+    audioState.isPlaying = true;
     console.log(`正在生成语音... 模型: ${model}`);
     
     const voiceValue = $("#tts_voice").val() || "alex";
@@ -308,13 +312,20 @@ async function generateTTS(text) {
     const audio = new Audio(audioUrl);
     
     if (extension_settings[extensionName].autoPlay) {
-      audioState.isPlaying = true;
-      audio.addEventListener('ended', () => { audioState.isPlaying = false; });
-      audio.addEventListener('error', () => { audioState.isPlaying = false; });
+      audio.addEventListener('ended', () => { 
+        audioState.isPlaying = false; 
+        URL.revokeObjectURL(audioUrl);
+      });
+      audio.addEventListener('error', () => { 
+        audioState.isPlaying = false; 
+        toastr.error("音频播放失败", "错误");
+      });
       audio.play().catch(err => {
         audioState.isPlaying = false;
         console.error('播放失败:', err);
       });
+    } else {
+        audioState.isPlaying = false;
     }
     
     const downloadLink = $(`<a href="${audioUrl}" download="tts_output.mp3">下载音频</a>`);
@@ -330,11 +341,10 @@ async function generateTTS(text) {
   }
 }
 
-// 提取文本的辅助函数 (核心优化)
+// 提取文本的辅助函数
 function extractTextWithMarkers(text, startMarkersStr, endMarkersStr) {
     if (!startMarkersStr || !endMarkersStr) return text;
 
-    // 支持中文逗号和英文逗号分割
     const startArr = startMarkersStr.split(/[,，]/).map(s => s.trim()).filter(s => s);
     const endArr = endMarkersStr.split(/[,，]/).map(s => s.trim()).filter(s => s);
 
@@ -342,50 +352,26 @@ function extractTextWithMarkers(text, startMarkersStr, endMarkersStr) {
 
     let extractedParts = [];
     let hasMatch = false;
-
-    // 转义正则特殊字符
     const escapeRegex = (str) => str.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-
-    // 遍历每一对标记
-    // 假设 text = "他说：“你好”，想了想(真奇怪)"
-    // 标记1: “...” 标记2: (...)
-    
-    // 为了保持原本的语序，我们不能简单地先后运行正则，而是应该找到所有匹配项然后按位置排序
-    // 但为了简单实现，我们可以把所有规则合并成一个大正则
-    // 比如: (“(.*?)|”)|(\((.*?)\))
-    
-    // 构建所有对的正则片段
     const patterns = [];
     const minLen = Math.min(startArr.length, endArr.length);
     
     for (let i = 0; i < minLen; i++) {
         const s = escapeRegex(startArr[i]);
         const e = escapeRegex(endArr[i]);
-        // 非贪婪匹配
         patterns.push(`${s}(.*?)${e}`);
     }
     
     if (patterns.length === 0) return text;
 
-    // 组合正则
     const combinedRegex = new RegExp(patterns.join('|'), 'g');
-    
     const matches = text.matchAll(combinedRegex);
     for (const match of matches) {
         hasMatch = true;
-        // match[0] 是完整匹配 (如 “你好”)
-        // 我们需要把标记去掉。
-        // 因为这是一个组合正则，我们不确定是哪一组匹配到了，
-        // 最简单的方法是用当前匹配到的完整字符串，去除对应的开始和结束标记
-        
         let content = match[0];
-        // 暴力去除匹配到的首尾标记
-        // 找到是哪一组匹配的
         for (let i = 0; i < minLen; i++) {
              if (content.startsWith(startArr[i]) && content.endsWith(endArr[i])) {
-                 // 去掉头部
                  content = content.substring(startArr[i].length);
-                 // 去掉尾部
                  content = content.substring(0, content.length - endArr[i].length);
                  break;
              }
@@ -394,42 +380,44 @@ function extractTextWithMarkers(text, startMarkersStr, endMarkersStr) {
     }
 
     if (hasMatch && extractedParts.length > 0) {
-        return extractedParts.join(' '); // 将提取出的片段用空格连接
+        return extractedParts.join(' ');
     }
-
-    // 如果设置了标记但没有找到任何匹配内容
-    // 通常意味着这句话可能是旁白。
-    // 如果没有提取到任何内容，我们默认读全文 (作为兜底)，或者根据需求可以改成不读。
-    // 这里保持原逻辑：无匹配则读全文。如果想无匹配不读，可以返回 ""。
     return text; 
 }
 
-// 监听消息事件
+// 监听消息事件 (已优化触发稳定性)
 function setupMessageListener() {
-  // 角色消息
+  // 角色消息触发逻辑优化
   eventSource.on(event_types.CHARACTER_MESSAGE_RENDERED, async (messageId) => {
+    // 如果已经处理过这个 ID，跳过
     if (audioState.lastProcessedMessageId === messageId) return;
     if (!$("#auto_play_audio").prop("checked")) return;
-    
+
+    // 清除之前的定时器，防止流式输出频繁触发
     if (audioState.processingTimeout) clearTimeout(audioState.processingTimeout);
     
+    // 设置稍长的延迟，确保“正文输出完毕”
     audioState.processingTimeout = setTimeout(() => {
-      if (audioState.lastProcessedMessageId === messageId) return;
-      audioState.lastProcessedMessageId = messageId;
-      
       const messageElement = $(`.mes[mesid="${messageId}"]`);
+      
+      // 关键判断：如果消息还在生成中（sillytavern 标记），则继续等
+      if (messageElement.find('.typing-indicator, .dot-flashing').length > 0) {
+          console.log("消息仍在生成中，稍后再试...");
+          eventSource.emit(event_types.CHARACTER_MESSAGE_RENDERED, messageId);
+          return;
+      }
+
+      audioState.lastProcessedMessageId = messageId;
       const message = messageElement.find('.mes_text').text();
       
-      if (!message) return;
+      if (!message || message.trim().length < 1) return;
       
       const textStart = $("#image_text_start").val();
       const textEnd = $("#image_text_end").val();
-      
-      // 使用新的提取逻辑
       const textToRead = extractTextWithMarkers(message, textStart, textEnd);
       
       generateTTS(textToRead);
-    }, 1000);
+    }, 1200); // 增加到1.2秒，避开最后一波渲染
   });
   
   // 用户消息
@@ -470,6 +458,8 @@ async function uploadVoice() {
           text: voiceText,
           audio: base64Audio
         };
+        
+        toastr.info("正在上传音色...", "请稍候");
         
         const response = await fetch(`${apiUrl}/uploads/audio/voice`, {
           method: 'POST',
@@ -532,9 +522,9 @@ function updateCustomVoicesList() {
   customVoices.forEach(voice => {
     const name = voice.name || voice.customName || "未命名";
     html += `
-      <div style="margin: 5px 0; padding: 5px; border: 1px solid #ddd;">
+      <div style="margin: 5px 0; padding: 5px; border: 1px solid rgba(255,255,255,0.1); border-radius:8px;">
         <span>${name}</span>
-        <button class="menu_button delete-voice" data-uri="${voice.uri}" data-name="${name}" style="float: right; font-size: 12px;">删除</button>
+        <button class="menu_button delete-voice" data-uri="${voice.uri}" data-name="${name}" style="float: right; font-size: 11px; padding: 4px 8px;">删除</button>
       </div>`;
   });
   listContainer.html(html);
@@ -586,7 +576,7 @@ jQuery(async () => {
   
   $("#tts_model").on("change", function() {
       extension_settings[extensionName].ttsModel = $(this).val();
-      updateVoiceOptions(); // 确保音色列表保持可见
+      updateVoiceOptions();
   });
   
   $("#upload_voice").on("click", uploadVoice);
@@ -599,8 +589,10 @@ jQuery(async () => {
     extension_settings[extensionName].ttsVoice = $("#tts_voice").val();
     await generateTTS($("#tts_test_text").val() || "测试语音");
   });
+
+  $("#tts_speed").on("input", function() { $("#tts_speed_value").text($(this).val()); });
+  $("#tts_gain").on("input", function() { $("#tts_gain_value").text($(this).val()); });
   
-  // 自动保存
   $("#auto_play_audio, #auto_play_user").on("change", saveSettings);
   $("#image_text_start, #image_text_end").on("input", () => {
       extension_settings[extensionName].textStart = $("#image_text_start").val();
