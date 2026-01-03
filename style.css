@@ -1,152 +1,103 @@
-/* 生图与语音功能插件 - 样式文件 */
-/* 避免影响全局样式 */
-
-/* 主插件容器 */
-.siliconflow-extension-settings .extension-block {
-    /* 不设置背景色，继承主题背景 */
-    border: 1px solid var(--SmartThemeBorderColor, #444);
-    border-radius: 8px;
-    padding: 15px;
-    margin-bottom: 20px;
+/* SiliconFlow 现代化 UI */
+.siliconflow-extension-settings {
+    --sf-primary: #6366f1;
+    --sf-primary-hover: #4f46e5;
+    --sf-bg: rgba(255, 255, 255, 0.05);
+    --sf-border: rgba(255, 255, 255, 0.1);
+    --sf-text: var(--SmartThemeBodyColor);
+    font-family: 'Segoe UI', system-ui, sans-serif;
 }
 
-.siliconflow-extension-settings .extension-title {
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    margin-bottom: 10px;
-}
-
-.siliconflow-extension-settings .extension-title h3 {
-    margin: 0;
-    color: var(--SmartThemeBodyColor, #333);
-}
-
-.siliconflow-extension-settings .extension-version {
-    color: var(--SmartThemeBodyColor, #666);
-    font-size: 0.9em;
-}
-
-.siliconflow-extension-settings hr.sysHR {
-    border: 0;
-    border-top: 1px solid var(--SmartThemeBorderColor, #ddd);
-    margin: 15px 0;
-}
-
-/* 插件容器内的样式 */
-.siliconflow-extension-settings .setting-item {
+.siliconflow-extension-settings .inline-drawer {
+    border: 1px solid var(--sf-border) !important;
+    background: var(--sf-bg);
+    backdrop-filter: blur(10px);
+    border-radius: 12px !important;
+    box-shadow: 0 8px 32px rgba(0,0,0,0.2);
     margin-bottom: 15px;
 }
 
-.siliconflow-extension-settings .setting-item label {
-    display: block;
-    margin-bottom: 5px;
-    color: var(--SmartThemeBodyColor, #666);
+.siliconflow-extension-settings .inline-drawer-header {
+    background: linear-gradient(90deg, rgba(99, 102, 241, 0.1), transparent);
+    padding: 12px 18px !important;
+    font-weight: 600;
+    letter-spacing: 0.5px;
 }
 
-.siliconflow-extension-settings input[type="text"],
-.siliconflow-extension-settings input[type="password"],
-.siliconflow-extension-settings input[type="number"],
-.siliconflow-extension-settings select,
+.siliconflow-extension-settings .setting-item {
+    background: rgba(0,0,0,0.2);
+    padding: 12px;
+    border-radius: 8px;
+    margin-bottom: 10px;
+    border: 1px solid transparent;
+    transition: all 0.2s;
+}
+
+.siliconflow-extension-settings .setting-item:hover {
+    border-color: var(--sf-primary);
+    background: rgba(0,0,0,0.3);
+}
+
+.siliconflow-extension-settings input, 
+.siliconflow-extension-settings select, 
 .siliconflow-extension-settings textarea {
-    width: calc(100% - 20px);
-    padding: 8px;
-    margin: 5px 0;
-    border: 1px solid var(--SmartThemeBorderColor, #444);
-    border-radius: 4px;
-    background-color: var(--SmartThemeBlurTintColor);
-    color: var(--SmartThemeBodyColor);
-}
-
-.siliconflow-extension-settings input[type="range"] {
-    width: 200px;
-    margin-right: 10px;
+    background: rgba(15, 15, 15, 0.5) !important;
+    border: 1px solid var(--sf-border) !important;
+    border-radius: 6px !important;
+    color: #efefef !important;
+    padding: 8px !important;
 }
 
 .siliconflow-extension-settings .menu_button {
-    padding: 8px 15px;
-    margin: 5px;
-    white-space: nowrap;
-}
-
-.siliconflow-extension-settings h4 {
-    margin-top: 20px;
-    margin-bottom: 10px;
-    color: var(--SmartThemeBodyColor, #333);
-}
-
-.siliconflow-extension-settings small {
-    display: block;
-    color: var(--SmartThemeBodyColor, #888);
-    font-size: 0.85em;
-    margin-top: 5px;
-}
-
-#connection_status {
-    margin-left: 10px;
-    font-weight: bold;
-}
-
-#tts_output {
-    margin-top: 10px;
-    padding: 10px;
-    background-color: var(--SmartThemeBlurTintColor);
-    border-radius: 4px;
-}
-
-.button-group {
-    display: flex;
-    gap: 10px;
-    align-items: center;
-}
-
-/* inline-drawer 在插件内的样式 */
-.siliconflow-extension-settings .inline-drawer {
-    margin-bottom: 10px;
-    border: 1px solid var(--SmartThemeBorderColor, #e0e0e0);
-    border-radius: 6px;
-    overflow: hidden;
-}
-
-.siliconflow-extension-settings .inline-drawer-header {
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    padding: 10px 15px;
-    background-color: var(--SmartThemeBlurTintColor);
+    background: var(--sf-primary) !important;
+    color: white !important;
+    border: none !important;
+    border-radius: 6px !important;
+    padding: 8px 16px !important;
     cursor: pointer;
-    transition: background-color 0.2s;
+    transition: all 0.3s;
+    font-weight: 500;
 }
 
-.siliconflow-extension-settings .inline-drawer-header:hover {
-    background-color: var(--SmartThemeHoverColor, #e9ecef);
+.siliconflow-extension-settings .menu_button:hover {
+    background: var(--sf-primary-hover) !important;
+    transform: translateY(-1px);
+    box-shadow: 0 4px 12px rgba(99, 102, 241, 0.4);
 }
 
-.siliconflow-extension-settings .inline-drawer-content {
+/* 状态弹窗样式 */
+#tts_status_indicator {
+    position: fixed;
+    top: 20px;
+    right: 20px;
+    z-index: 10000;
+    padding: 10px 20px;
+    border-radius: 50px;
+    background: rgba(0, 0, 0, 0.8);
+    backdrop-filter: blur(5px);
+    color: white;
     display: none;
-    padding: 15px;
-    /* 不设置背景色，继承主题 */
-    border-top: 1px solid var(--SmartThemeBorderColor, #444);
+    align-items: center;
+    gap: 10px;
+    border: 1px solid var(--sf-primary);
+    box-shadow: 0 4px 15px rgba(0,0,0,0.5);
+    animation: sf-slideIn 0.3s ease;
 }
 
-.siliconflow-extension-settings .inline-drawer-icon {
-    transition: transform 0.3s;
+@keyframes sf-slideIn {
+    from { transform: translateX(100%); opacity: 0; }
+    to { transform: translateX(0); opacity: 1; }
 }
 
-.siliconflow-extension-settings .inline-drawer-icon.down {
-    transform: rotate(180deg);
+.sf-spinner {
+    width: 16px;
+    height: 16px;
+    border: 2px solid rgba(255,255,255,0.3);
+    border-top-color: var(--sf-primary);
+    border-radius: 50%;
+    animation: sf-spin 1s linear infinite;
 }
 
-/* 子分区样式 */
-.siliconflow-extension-settings .sub-section {
-    margin-top: 20px;
-    padding-top: 15px;
-    border-top: 1px solid var(--SmartThemeBorderColor, #e0e0e0);
-}
-
-.siliconflow-extension-settings .sub-section h4 {
-    margin-top: 0;
-    margin-bottom: 10px;
-    color: var(--SmartThemeBodyColor, #495057);
-    font-size: 1.1em;
+@keyframes sf-spin {
+    to { transform: rotate(360deg); }
 }
