@@ -1,145 +1,336 @@
 <div class="siliconflow-extension-settings">
-    <!-- 语音功能（TTS）主折叠面板 -->
-    <div class="inline-drawer">
-        <div class="inline-drawer-header inline-drawer-toggle">
-            <div class="header-content">
-                <i class="fa-solid fa-microchip"></i>
-                <b>硅基流动 语音合成 (TTS)</b>
-            </div>
-            <div class="inline-drawer-icon fa-solid fa-circle-chevron-down"></div>
-        </div>
+  <div class="inline-drawer">
+    <div class="inline-drawer-toggle inline-drawer-header">
+      <b>硅基流动 TTS 插件</b>
+      <div class="inline-drawer-icon fa-solid fa-circle-chevron-down"></div>
+    </div>
+    <div class="inline-drawer-content" style="display: none;">
 
+      </!-->
+      <div class="inline-drawer">
+        <div class="inline-drawer-toggle inline-drawer-header">
+          <b>API 设置</b>
+          <div class="inline-drawer-icon fa-solid fa-circle-chevron-down"></div>
+        </div>
         <div class="inline-drawer-content" style="display: none;">
-            
-            <!-- 第一部分：API 配置 -->
-            <div class="sub-section">
-                <h4><i class="fa-solid fa-gears"></i> API 连接设置</h4>
-                <div class="setting-item">
-                    <label for="siliconflow_api_key">API 密钥</label>
-                    <input id="siliconflow_api_key" type="password" placeholder="sk-..." />
-                </div>
-                
-                <div class="setting-item">
-                    <label for="siliconflow_api_url">API 接口地址</label>
-                    <input id="siliconflow_api_url" type="text" placeholder="https://api.siliconflow.cn/v1" />
-                    <small>支持兼容 OpenAI 格式的转发地址</small>
-                </div>
-                
-                <div class="button-group">
-                    <button id="test_siliconflow_connection" class="menu_button">
-                        <i class="fa-solid fa-link"></i> 测试连接
-                    </button>
-                    <button id="save_siliconflow_settings" class="menu_button">
-                        <i class="fa-solid fa-floppy-disk"></i> 保存配置
-                    </button>
-                    <span id="connection_status">未连接</span>
-                </div>
-            </div>
 
-            <!-- 第二部分：模型与音色 -->
-            <div class="sub-section">
-                <h4><i class="fa-solid fa-robot"></i> 模型与音色配置</h4>
-                
-                <div class="setting-item">
-                    <label for="tts_model">选择 TTS 模型</label>
-                    <div style="display: flex; gap: 8px;">
-                        <select id="tts_model" style="flex: 1;">
-                            <option value="FunAudioLLM/CosyVoice2-0.5B">CosyVoice2-0.5B (默认)</option>
-                        </select>
-                        <button id="refresh_models" class="menu_button" title="从云端刷新模型列表">
-                            <i class="fa-solid fa-rotate"></i>
-                        </button>
-                    </div>
-                </div>
-                
-                <div class="setting-item">
-                    <label for="tts_voice">语音角色 / 音色</label>
-                    <select id="tts_voice"></select>
-                </div>
+          <label for="siliconflow_api_key">API密钥：</label>
+          <input id="siliconflow_api_key" type="password" class="text_pole" placeholder="sk-xxxxxxxx" />
+</input>
+          <label for="siliconflow_api_url" style="margin-top: 10px;">API地址：</label>
+          <input id="siliconflow_api_url" type="text" class="text_pole" placeholder="https://api.siliconflow.cn/v1" /></input>
+          <small style="color: #888; display: block; margin-top: 5px;">支持兼容 OpenAI 格式的 API 地址</small>
 
-                <div class="setting-grid" style="display: grid; grid-template-columns: 1fr 1fr; gap: 15px;">
-                    <div class="setting-item">
-                        <label for="tts_speed">语速: <span id="tts_speed_value">1.0</span></label>
-                        <input type="range" id="tts_speed" min="0.25" max="4" step="0.25" value="1" />
-                    </div>
-                    <div class="setting-item">
-                        <label for="tts_gain">音量: <span id="tts_gain_value">0</span></label>
-                        <input type="range" id="tts_gain" min="-10" max="10" step="1" value="0" />
-                    </div>
-                </div>
-            </div>
-
-            <!-- 文本截取与排除设置 -->
-<div class="sub-section">
-    <h4><i class="fa-solid fa-filter"></i> 文本过滤与排除</h4>
-    
-    <div class="setting-item">
-        <label for="tts_exclude_regex">排除正则表达式 (Regex)：</label>
-        <input type="text" id="tts_exclude_regex" placeholder="例如：/\[.*?\]/g 或 /摘要.*/g" />
-        <small>匹配到的文字将被<b>剔除</b>，不进行朗读。支持标准 JS 正则格式。</small>
-    </div>
-
-    <div class="extraction-config" style="margin-top:15px; border-top: 1px dashed rgba(255,255,255,0.1); padding-top:10px;">
-        <small style="margin-bottom: 10px; display: block; opacity: 0.8;">
-            <i class="fa-solid fa-circle-info"></i> <b>包含模式：</b>只朗读特定符号内的内容（如对话）。
-        </small>
-        <div class="input-pair" style="display: flex; gap: 10px;">
-            <div class="setting-item" style="flex: 1;">
-                <label>开始标记</label>
-                <input type="text" id="image_text_start" placeholder="“, ( , 「" />
-            </div>
-            <div class="setting-item" style="flex: 1;">
-                <label>结束标记</label>
-                <input type="text" id="image_text_end" placeholder="”, ) , 」" />
-            </div>
-        </div>
-    </div>
-</div></div>
-
-            <!-- 第四部分：音色克隆 -->
-            <div class="sub-section">
-                <h4><i class="fa-solid fa-id-card-clip"></i> 音色克隆 (CosyVoice)</h4>
-                <div class="setting-item">
-                    <input type="text" id="clone_voice_name" placeholder="音色名称 (字母/数字)" />
-                </div>
-                <div class="setting-item">
-                    <textarea id="clone_voice_text" rows="2" placeholder="输入音频中的参考文本内容..."></textarea>
-                </div>
-                <div class="setting-item">
-                    <label class="file-input-label" for="clone_voice_audio">
-                         选择参考音频文件
-                    </label>
-                    <input type="file" id="clone_voice_audio" accept="audio/*" style="font-size: 0.8em;" />
-                </div>
-                <div class="button-group">
-                    <button id="upload_voice" class="menu_button primary">
-                        <i class="fa-solid fa-cloud-arrow-up"></i> 开始上传
-                    </button>
-                    <button id="refresh_custom_voices" class="menu_button">
-                        <i class="fa-solid fa-arrows-rotate"></i> 刷新列表
-                    </button>
-                </div>
-                <div class="setting-item" style="margin-top: 10px;">
-                    <label>已保存的自定义音色：</label>
-                    <div id="custom_voices_list" class="voice-list-container">
-                        <small>暂无数据</small>
-                    </div>
-                </div>
-            </div>
-
-            <!-- 第五部分：测试 -->
-            <div class="sub-section">
-                <h4><i class="fa-solid fa-vial"></i> 语音测试</h4>
-                <div class="setting-item">
-                    <textarea id="tts_test_text" placeholder="输入测试内容...">你好，连接成功，准备出发。</textarea>
-                </div>
-                <button id="test_tts" class="menu_button" style="width: 100%;">
-                    <i class="fa-solid fa-play"></i> 生成并试听
-                </button>
-                <div id="tts_output" style="margin-top: 10px; text-align: center;"></div>
-            </div>
+          <div style="display: flex; gap: 10px; margin-top: 15px; align-items: center;">
+            <button id="test_siliconflow_connection" class="menu_button">
+              <i class="fa-solid fa-plug"></i> 测试连接
+            </button>
+            <button id="save_siliconflow_settings" class="menu_button">
+              <i class="fa-solid fa-save"></i> 保存设置
+            </button>
+            <span id="connection_status" style="margin-left: 10px; font-size: 12px;">未连接</span>
+          </div>
 
         </div>
+      </div>
+
+      </!-->
+      <div class="inline-drawer">
+        <div class="inline-drawer-toggle inline-drawer-header">
+          <b>TTS模型设置</b>
+          <div class="inline-drawer-icon fa-solid fa-circle-chevron-down"></div>
+        </div>
+        <div class="inline-drawer-content" style="display: none;">
+
+          <label for="tts_model">TTS模型：</label>
+          <div style="display: flex; gap: 5px; align-items: center;">
+            <select id="tts_model" class="text_pole" style="flex: 1;">
+              <option value="FunAudioLLM/CosyVoice2-0.5B">CosyVoice2-0.5B (默认)</option>
+            </select>
+            <button id="fetch_models_btn" class="menu_button" title="从API获取可用模型" style="white-space: nowrap;">
+              <i class="fa-solid fa-refresh"></i> 获取模型
+            </button>
+          </div>
+          <small style="color: #888; display: block; margin-top: 5px;">点击右侧按钮从 API 获取可用模型</small>
+
+          <div style="display: flex; gap: 10px; margin-top: 10px; align-items: center;">
+            <button id="test_model_btn" class="menu_button">
+              <i class="fa-solid fa-flask"></i> 测试模型
+            </button>
+            <span id="model_test_status" style="font-size: 12px;"></span>
+          </div>
+
+          <hr style="margin: 15px 0; border-color: #444;" />
+</hr>
+          <label for="tts_voice">语音角色：</label>
+          <div style="display: flex; gap: 5px; align-items: center;">
+            <select id="tts_voice" class="text_pole" style="flex: 1;">
+              <option value="alex">Alex (男声)</option>
+              <option value="anna">Anna (女声)</option>
+              <option value="bella">Bella (女声)</option>
+              <option value="benjamin">Benjamin (男声)</option>
+              <option value="charles">Charles (男声)</option>
+              <option value="claire">Claire (女声)</option>
+              <option value="david">David (男声)</option>
+              <option value="diana">Diana (女声)</option>
+            </select>
+            <button id="refresh_voices_btn" class="menu_button" title="刷新音色列表">
+              <i class="fa-solid fa-sync"></i>
+            </button>
+          </div>
+
+          <div style="margin-top: 15px;">
+            <label for="tts_speed">语速（0.25-4.0）：<span id="tts_speed_value">1.0</span></label>
+            <input type="range" id="tts_speed" min="0.25" max="4" step="0.05" value="1.0" class="text_pole" /></input>
+          </div>
+
+          <div style="margin-top: 10px;">
+            <label for="tts_gain">音量增益（-10到10）：<span id="tts_gain_value">0</span></label>
+            <input type="range" id="tts_gain" min="-10" max="10" step="0.5" value="0" class="text_pole" /></input>
+          </div>
+
+        </div>
+      </div>
+
+      </!-->
+      <div class="inline-drawer">
+        <div class="inline-drawer-toggle inline-drawer-header">
+          <b>自动朗读设置</b>
+          <div class="inline-drawer-icon fa-solid fa-circle-chevron-down"></div>
+        </div>
+        <div class="inline-drawer-content" style="display: none;">
+
+          <div style="margin: 10px 0;">
+            <label class="checkbox_label">
+              <input type="checkbox" id="auto_play_audio" checked /></input>
+              <span>自动朗读角色消息</span>
+            </label>
+          </div>
+
+          <div style="margin: 10px 0;">
+            <label class="checkbox_label">
+              <input type="checkbox" id="auto_play_user" /></input>
+              <span>自动朗读用户消息</span>
+            </label>
+          </div>
+
+          <hr style="margin: 15px 0; border-color: #444;" />
+</hr>
+          <label><b>文本截取设置</b></label>
+          <small style="color: #888; display: block; margin: 5px 0;">设置开始和结束标记后，只朗读标记内的文本</small>
+          <div style="display: flex; gap: 10px; margin-top: 10px;">
+            <div style="flex: 1;">
+              <label for="image_text_start">开始标记：</label>
+              <input id="image_text_start" type="text" class="text_pole" placeholder="（" /></input>
+            </div>
+            <div style="flex: 1;">
+              <label for="image_text_end">结束标记：</label>
+              <input id="image_text_end" type="text" class="text_pole" placeholder="）" /></input>
+            </div>
+          </div>
+
+        </div>
+      </div>
+
+      </!-->
+      <div class="inline-drawer">
+        <div class="inline-drawer-toggle inline-drawer-header">
+          <b>克隆音色功能</b>
+          <div class="inline-drawer-icon fa-solid fa-circle-chevron-down"></div>
+        </div>
+        <div class="inline-drawer-content" style="display: none;">
+
+          <label for="clone_voice_name">音色名称：</label>
+          <input id="clone_voice_name" type="text" class="text_pole" placeholder="my_voice (仅英文、数字、下划线、连字符)" /></input>
+          <small style="color: #888; display: block; margin-top: 3px;">只能包含英文字母、数字、下划线和连字符，最多64个字符</small>
+
+          <label for="clone_voice_text" style="margin-top: 10px;">参考文本：</label>
+          <textarea id="clone_voice_text" class="text_pole" rows="3" placeholder="请输入与参考音频对应的文本内容..."></textarea>
+          <small style="color: #888; display: block; margin-top: 3px;">输入参考音频中说的话，用于音色克隆</small>
+
+          <label for="clone_voice_audio" style="margin-top: 10px;">参考音频：</label>
+          <input id="clone_voice_audio" type="file" accept="audio/*" class="text_pole" /></input>
+          <small style="color: #888; display: block; margin-top: 3px;">上传一段清晰的语音样本（建议5-30秒）</small>
+
+          <div style="display: flex; gap: 10px; margin-top: 15px;">
+            <button id="upload_voice" class="menu_button">
+              <i class="fa-solid fa-upload"></i> 上传克隆音色
+            </button>
+            <button id="refresh_custom_voices" class="menu_button">
+              <i class="fa-solid fa-sync"></i> 刷新音色列表
+            </button>
+          </div>
+
+          <hr style="margin: 15px 0; border-color: #444;" />
+</hr>
+          <label><b>已克隆的音色：</b></label>
+          <div id="custom_voices_list" style="margin-top: 10px; max-height: 200px; overflow-y: auto;">
+            <small>暂无自定义音色</small>
+          </div>
+
+        </div>
+      </div>
+
+      </!-->
+      <div class="inline-drawer">
+        <div class="inline-drawer-toggle inline-drawer-header">
+          <b>TTS测试</b>
+          <div class="inline-drawer-icon fa-solid fa-circle-chevron-down"></div>
+        </div>
+        <div class="inline-drawer-content" style="display: none;">
+
+          <label for="tts_test_text">测试文本：</label>
+          <textarea id="tts_test_text" class="text_pole" rows="3" placeholder="输入测试文本...">你好，这是一个测试语音。</textarea>
+
+          <div style="margin-top: 15px;">
+            <button id="test_tts" class="menu_button">
+              <i class="fa-solid fa-play"></i> 生成测试语音
+            </button>
+          </div>
+
+          <div id="tts_output" style="margin-top: 10px;"></div>
+
+        </div>
+      </div>
+
+      </!-->
+      <input type="hidden" id="response_format" value="mp3" /></input>
+      <input type="hidden" id="sample_rate" value="32000" /></input>
+      <input type="hidden" id="image_size" value="512" /></input>
+      <input type="hidden" id="generation_frequency" value="5" />
+</input>
     </div>
+  </div>
 </div>
 
+<style>
+  .siliconflow-extension-settings .inline-drawer {
+    margin-bottom: 5px;
+  }
+
+  .siliconflow-extension-settings .inline-drawer-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 8px 10px;
+    background: rgba(255, 255, 255, 0.05);
+    border-radius: 4px;
+    cursor: pointer;
+    user-select: none;
+  }
+
+  .siliconflow-extension-settings .inline-drawer-header:hover {
+    background: rgba(255, 255, 255, 0.1);
+  }
+
+  .siliconflow-extension-settings .inline-drawer-icon {
+    transition: transform 0.3s ease;
+  }
+
+  .siliconflow-extension-settings .inline-drawer-icon.down {
+    transform: rotate(180deg);
+  }
+
+  .siliconflow-extension-settings .inline-drawer-content {
+    padding: 15px 10px;
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    border-top: none;
+    border-radius: 0 0 4px 4px;
+  }
+
+  .siliconflow-extension-settings label {
+    display: block;
+    margin-bottom: 5px;
+    font-weight: 500;
+  }
+
+  .siliconflow-extension-settings .text_pole {
+    width: 100%;
+    margin-bottom: 5px;
+  }
+
+  .siliconflow-extension-settings .menu_button {
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+    padding: 6px 12px;
+    font-size: 13px;
+  }
+
+  .siliconflow-extension-settings .menu_button i {
+    font-size: 12px;
+  }
+
+  .siliconflow-extension-settings .checkbox_label {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    cursor: pointer;
+  }
+
+  .siliconflow-extension-settings .checkbox_label input[type="checkbox"] {
+    width: 16px;
+    height: 16px;
+    cursor: pointer;
+  }
+
+  .siliconflow-extension-settings hr {
+    border: none;
+    border-top: 1px solid rgba(255, 255, 255, 0.1);
+  }
+
+  .siliconflow-extension-settings .custom-voice-item {
+    background: rgba(255, 255, 255, 0.03);
+    transition: background 0.2s;
+  }
+
+  .siliconflow-extension-settings .custom-voice-item:hover {
+    background: rgba(255, 255, 255, 0.08);
+  }
+
+  .siliconflow-extension-settings input[type="range"] {
+    -webkit-appearance: none;
+    width: 100%;
+    height: 6px;
+    background: rgba(255, 255, 255, 0.2);
+    border-radius: 3px;
+    outline: none;
+  }
+
+  .siliconflow-extension-settings input[type="range"]::-webkit-slider-thumb {
+    -webkit-appearance: none;
+    width: 16px;
+    height: 16px;
+    background: #4a9eff;
+    border-radius: 50%;
+    cursor: pointer;
+  }
+
+  .siliconflow-extension-settings input[type="range"]::-moz-range-thumb {
+    width: 16px;
+    height: 16px;
+    background: #4a9eff;
+    border-radius: 50%;
+    cursor: pointer;
+    border: none;
+  }
+
+  .siliconflow-extension-settings select optgroup {
+    font-weight: bold;
+    font-style: normal;
+  }
+
+  .siliconflow-extension-settings #tts_output a {
+    display: inline-block;
+    padding: 8px 15px;
+    background: #4a9eff;
+    color: white;
+    text-decoration: none;
+    border-radius: 4px;
+    font-size: 13px;
+  }
+
+  .siliconflow-extension-settings #tts_output a:hover {
+    background: #3a8eef;
+  }
+</style>
