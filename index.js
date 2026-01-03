@@ -27,8 +27,8 @@ const defaultSettings = {
   sampleRate: 32000,
   imageModel: "",
   imageSize: "512",
-  textStart: "（",
-  textEnd: "）",
+  textStart: "", // 默认为空，不开启截取
+  textEnd: "",
   generationFrequency: 5,
   autoPlay: true,
   autoPlayUser: false,
@@ -37,14 +37,14 @@ const defaultSettings = {
 
 // 通用预设音色列表
 const COMMON_VOICES = {
-  "alex": "Alex (男声)",
-  "anna": "Anna (女声)",
-  "bella": "Bella (女声)",
-  "benjamin": "Benjamin (男声)",
-  "charles": "Charles (男声)",
-  "claire": "Claire (女声)",
-  "david": "David (男声)",
-  "diana": "Diana (女声)"
+  "alex": "Alex (CosyVoice专用)",
+  "anna": "Anna (CosyVoice专用)",
+  "bella": "Bella (CosyVoice专用)",
+  "benjamin": "Benjamin (CosyVoice专用)",
+  "charles": "Charles (CosyVoice专用)",
+  "claire": "Claire (CosyVoice专用)",
+  "david": "David (CosyVoice专用)",
+  "diana": "Diana (CosyVoice专用)"
 };
 
 // 加载设置
@@ -79,7 +79,7 @@ async function loadSettings() {
   $("#auto_play_audio").prop("checked", extension_settings[extensionName].autoPlay !== false);
   $("#auto_play_user").prop("checked", extension_settings[extensionName].autoPlayUser === true);
   
-  // 关键修复：最后再更新音色列表，并传入当前保存的设置
+  // 更新音色列表
   updateVoiceOptions(extension_settings[extensionName].ttsVoice || defaultSettings.ttsVoice);
 }
 
@@ -168,18 +168,15 @@ async function fetchRemoteModels() {
     }
 }
 
-// 更新音色选项 (逻辑修复版)
+// 更新音色选项
 function updateVoiceOptions(targetVoice = null) {
   const voiceSelect = $("#tts_voice");
-  
-  // 1. 确定我们要选中的值：优先使用传入的值，其次是当前UI的值，最后是设置里的值
   let voiceToSelect = targetVoice || voiceSelect.val() || extension_settings[extensionName].ttsVoice || "alex";
   
-  // 2. 清空并重新生成列表
   voiceSelect.empty();
   
   // 添加通用预设音色
-  voiceSelect.append('<optgroup label="预设音色">');
+  voiceSelect.append('<optgroup label="预设音色 (仅限CosyVoice模型)">');
   Object.entries(COMMON_VOICES).forEach(([value, name]) => {
     voiceSelect.append(`<option value="${value}">${name}</option>`);
   });
@@ -188,7 +185,7 @@ function updateVoiceOptions(targetVoice = null) {
   // 添加自定义音色
   const customVoices = extension_settings[extensionName].customVoices || [];
   if (customVoices.length > 0) {
-    voiceSelect.append('<optgroup label="自定义音色">');
+    voiceSelect.append('<optgroup label="自定义音色 (适用于所有模型)">');
     customVoices.forEach(voice => {
       const voiceName = voice.name || voice.customName || voice.custom_name || "未命名";
       const voiceUri = voice.uri || voice.id || voice.voice_id;
@@ -197,15 +194,10 @@ function updateVoiceOptions(targetVoice = null) {
     voiceSelect.append('</optgroup>');
   }
   
-  // 3. 尝试设置选中值
   voiceSelect.val(voiceToSelect);
-  
-  // 4. 如果设置失败（比如该音色不存在了），默认选中第一个
   if (!voiceSelect.val()) {
       voiceSelect.val("alex");
   }
-  
-  // 5. 同步回设置
   extension_settings[extensionName].ttsVoice = voiceSelect.val();
 }
 
@@ -214,7 +206,7 @@ function saveSettings() {
   extension_settings[extensionName].apiKey = $("#siliconflow_api_key").val();
   extension_settings[extensionName].apiUrl = $("#siliconflow_api_url").val();
   extension_settings[extensionName].ttsModel = $("#tts_model").val();
-  extension_settings[extensionName].ttsVoice = $("#tts_voice").val(); // 此时 tts_voice 一定有值
+  extension_settings[extensionName].ttsVoice = $("#tts_voice").val();
   extension_settings[extensionName].ttsSpeed = parseFloat($("#tts_speed").val());
   extension_settings[extensionName].ttsGain = parseFloat($("#tts_gain").val());
   extension_settings[extensionName].textStart = $("#image_text_start").val();
@@ -264,8 +256,8 @@ async function generateTTS(text) {
     toastr.error("请先配置API密钥", "TTS错误");
     return;
   }
-  if (!text) {
-    toastr.error("文本不能为空", "TTS错误");
+  if (!text || text.trim().length === 0) {
+    console.log("TTS文本为空，跳过生成");
     return;
   }
   if (audioState.isPlaying) {
@@ -280,19 +272,12 @@ async function generateTTS(text) {
     const speed = parseFloat($("#tts_speed").val()) || 1.0;
     const gain = parseFloat($("#tts_gain").val()) || 0;
     
-    // 构造 voice 参数
     let voiceParam;
-    
-    // 情况A: 自定义音色或URI
     if (voiceValue.startsWith("speech:") || voiceValue.includes("/")) {
       voiceParam = voiceValue;
-    } 
-    // 情况B: CosyVoice2 需要 Model:Voice 格式
-    else if (model === "FunAudioLLM/CosyVoice2-0.5B") {
+    } else if (model === "FunAudioLLM/CosyVoice2-0.5B") {
       voiceParam = `${model}:${voiceValue}`;
-    }
-    // 情况C: 其他模型 (IndexTTS, OpenAI等) 通常只需要音色名
-    else {
+    } else {
       voiceParam = voiceValue;
     }
     
@@ -320,7 +305,6 @@ async function generateTTS(text) {
     
     const audioBlob = await response.blob();
     const audioUrl = URL.createObjectURL(audioBlob);
-    
     const audio = new Audio(audioUrl);
     
     if (extension_settings[extensionName].autoPlay) {
@@ -346,6 +330,80 @@ async function generateTTS(text) {
   }
 }
 
+// 提取文本的辅助函数 (核心优化)
+function extractTextWithMarkers(text, startMarkersStr, endMarkersStr) {
+    if (!startMarkersStr || !endMarkersStr) return text;
+
+    // 支持中文逗号和英文逗号分割
+    const startArr = startMarkersStr.split(/[,，]/).map(s => s.trim()).filter(s => s);
+    const endArr = endMarkersStr.split(/[,，]/).map(s => s.trim()).filter(s => s);
+
+    if (startArr.length === 0 || endArr.length === 0) return text;
+
+    let extractedParts = [];
+    let hasMatch = false;
+
+    // 转义正则特殊字符
+    const escapeRegex = (str) => str.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+
+    // 遍历每一对标记
+    // 假设 text = "他说：“你好”，想了想(真奇怪)"
+    // 标记1: “...” 标记2: (...)
+    
+    // 为了保持原本的语序，我们不能简单地先后运行正则，而是应该找到所有匹配项然后按位置排序
+    // 但为了简单实现，我们可以把所有规则合并成一个大正则
+    // 比如: (“(.*?)|”)|(\((.*?)\))
+    
+    // 构建所有对的正则片段
+    const patterns = [];
+    const minLen = Math.min(startArr.length, endArr.length);
+    
+    for (let i = 0; i < minLen; i++) {
+        const s = escapeRegex(startArr[i]);
+        const e = escapeRegex(endArr[i]);
+        // 非贪婪匹配
+        patterns.push(`${s}(.*?)${e}`);
+    }
+    
+    if (patterns.length === 0) return text;
+
+    // 组合正则
+    const combinedRegex = new RegExp(patterns.join('|'), 'g');
+    
+    const matches = text.matchAll(combinedRegex);
+    for (const match of matches) {
+        hasMatch = true;
+        // match[0] 是完整匹配 (如 “你好”)
+        // 我们需要把标记去掉。
+        // 因为这是一个组合正则，我们不确定是哪一组匹配到了，
+        // 最简单的方法是用当前匹配到的完整字符串，去除对应的开始和结束标记
+        
+        let content = match[0];
+        // 暴力去除匹配到的首尾标记
+        // 找到是哪一组匹配的
+        for (let i = 0; i < minLen; i++) {
+             if (content.startsWith(startArr[i]) && content.endsWith(endArr[i])) {
+                 // 去掉头部
+                 content = content.substring(startArr[i].length);
+                 // 去掉尾部
+                 content = content.substring(0, content.length - endArr[i].length);
+                 break;
+             }
+        }
+        extractedParts.push(content.trim());
+    }
+
+    if (hasMatch && extractedParts.length > 0) {
+        return extractedParts.join(' '); // 将提取出的片段用空格连接
+    }
+
+    // 如果设置了标记但没有找到任何匹配内容
+    // 通常意味着这句话可能是旁白。
+    // 如果没有提取到任何内容，我们默认读全文 (作为兜底)，或者根据需求可以改成不读。
+    // 这里保持原逻辑：无匹配则读全文。如果想无匹配不读，可以返回 ""。
+    return text; 
+}
+
 // 监听消息事件
 function setupMessageListener() {
   // 角色消息
@@ -367,18 +425,10 @@ function setupMessageListener() {
       const textStart = $("#image_text_start").val();
       const textEnd = $("#image_text_end").val();
       
-      if (textStart && textEnd) {
-        const escapeRegex = (str) => str.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-        const regex = new RegExp(`${escapeRegex(textStart)}(.*?)${escapeRegex(textEnd)}`, 'g');
-        const matches = message.match(regex);
-        
-        if (matches && matches.length > 0) {
-            const texts = matches.map(m => m.replace(textStart, '').replace(textEnd, '').trim()).join(' ');
-            generateTTS(texts);
-            return;
-        }
-      }
-      generateTTS(message);
+      // 使用新的提取逻辑
+      const textToRead = extractTextWithMarkers(message, textStart, textEnd);
+      
+      generateTTS(textToRead);
     }, 1000);
   });
   
@@ -534,7 +584,6 @@ jQuery(async () => {
       extension_settings[extensionName].apiUrl = $(this).val();
   });
   
-  // 关键修复：当模型改变时，也刷新一下音色列表，并保存设置
   $("#tts_model").on("change", function() {
       extension_settings[extensionName].ttsModel = $(this).val();
       updateVoiceOptions(); // 确保音色列表保持可见
