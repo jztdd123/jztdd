@@ -69,35 +69,32 @@
                 </div>
             </div>
 
-            <!-- 第三部分：自动化与截取 -->
-            <div class="sub-section">
-                <h4><i class="fa-solid fa-wand-magic-sparkles"></i> 播放控制与文本截取</h4>
-                
-                <div class="checkbox-group" style="margin-bottom: 15px;">
-                    <label class="checkbox-item">
-                        <input type="checkbox" id="auto_play_audio" checked /> 自动朗读角色消息
-                    </label>
-                    <label class="checkbox-item">
-                        <input type="checkbox" id="auto_play_user" /> 自动朗读用户消息
-                    </label>
-                </div>
+            <!-- 文本截取与排除设置 -->
+<div class="sub-section">
+    <h4><i class="fa-solid fa-filter"></i> 文本过滤与排除</h4>
+    
+    <div class="setting-item">
+        <label for="tts_exclude_regex">排除正则表达式 (Regex)：</label>
+        <input type="text" id="tts_exclude_regex" placeholder="例如：/\[.*?\]/g 或 /摘要.*/g" />
+        <small>匹配到的文字将被<b>剔除</b>，不进行朗读。支持标准 JS 正则格式。</small>
+    </div>
 
-                <div class="extraction-config">
-                    <small style="margin-bottom: 10px; display: block; opacity: 0.8;">
-                        <i class="fa-solid fa-circle-info"></i> 仅朗读特定符号内的内容（如对话），多组用逗号分隔。
-                    </small>
-                    <div class="input-pair" style="display: flex; gap: 10px;">
-                        <div class="setting-item" style="flex: 1;">
-                            <label>开始标记</label>
-                            <input type="text" id="image_text_start" placeholder="“, ( , 「" />
-                        </div>
-                        <div class="setting-item" style="flex: 1;">
-                            <label>结束标记</label>
-                            <input type="text" id="image_text_end" placeholder="”, ) , 」" />
-                        </div>
-                    </div>
-                </div>
+    <div class="extraction-config" style="margin-top:15px; border-top: 1px dashed rgba(255,255,255,0.1); padding-top:10px;">
+        <small style="margin-bottom: 10px; display: block; opacity: 0.8;">
+            <i class="fa-solid fa-circle-info"></i> <b>包含模式：</b>只朗读特定符号内的内容（如对话）。
+        </small>
+        <div class="input-pair" style="display: flex; gap: 10px;">
+            <div class="setting-item" style="flex: 1;">
+                <label>开始标记</label>
+                <input type="text" id="image_text_start" placeholder="“, ( , 「" />
             </div>
+            <div class="setting-item" style="flex: 1;">
+                <label>结束标记</label>
+                <input type="text" id="image_text_end" placeholder="”, ) , 」" />
+            </div>
+        </div>
+    </div>
+</div></div>
 
             <!-- 第四部分：音色克隆 -->
             <div class="sub-section">
@@ -145,3 +142,4 @@
         </div>
     </div>
 </div>
+
