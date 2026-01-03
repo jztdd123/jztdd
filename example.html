@@ -116,18 +116,57 @@
 
           <hr style="margin: 15px 0; border-color: #444;" />
 </hr>
+          </!-->
+          <label><b>正则屏蔽设置</b></label>
+          <small style="color: #888; display: block; margin: 5px 0 10px 0;">
+            使用正则表达式过滤不需要朗读的内容，如思考标签、动作描述等
+          </small>
+
+          <label for="regex_filter">屏蔽正则：</label>
+          <input id="regex_filter" type="text" class="text_pole"
+                 placeholder="|\*[^*]+\*"
+                 value="|\*[^*]+\*" /></input>
+          <small style="color: #888; display: block; margin-top: 5px;">
+            常用示例：<br/></br>
+            • <code><think>[\s\S]*?</think></code> - 屏蔽think标签<br/></br>
+            • <code>\*[^*]+\*</code> - 屏蔽星号动作 *动作*<br/></br>
+            • <code>（[^）]+）</code> - 屏蔽中文括号内容<br/></br>
+            • 多个规则用 <code>|</code> 连接
+          </small>
+
+          <div style="margin-top: 15px; padding: 12px; background: rgba(0,0,0,0.2); border-radius: 8px;">
+            <label for="regex_test_text" style="font-size: 0.85em;">测试正则效果：</label>
+            <textarea id="regex_test_text" class="text_pole" rows="2"
+                      placeholder="粘贴测试文本...">「这是对话」*动作描述*</textarea>
+            <button id="test_regex" class="menu_button" style="margin-top: 8px;">
+              <i class="fa-solid fa-vial"></i> 测试屏蔽效果
+            </button>
+            <div id="regex_test_result" style="margin-top: 10px; padding: 10px; background: rgba(0,0,0,0.15); border-radius: 6px; font-size: 0.9em; color: #aaa; min-height: 20px; word-break: break-all;">
+              (结果将显示在这里)
+            </div>
+          </div>
+
+          <hr style="margin: 15px 0; border-color: #444;" />
+</hr>
+          </!-->
           <label><b>文本截取设置</b></label>
-          <small style="color: #888; display: block; margin: 5px 0;">设置开始和结束标记后，只朗读标记内的文本</small>
+          <small style="color: #888; display: block; margin: 5px 0;">
+            设置开始和结束标记后，只朗读标记内的文本。<br/></br>
+            <b>支持多组标记</b>：用英文逗号分隔，如 <code>「,"</code> 和 <code>」,"</code>
+          </small>
           <div style="display: flex; gap: 10px; margin-top: 10px;">
             <div style="flex: 1;">
               <label for="image_text_start">开始标记：</label>
-              <input id="image_text_start" type="text" class="text_pole" placeholder="（" /></input>
+              <input id="image_text_start" type="text" class="text_pole" placeholder="「,",（" /></input>
             </div>
             <div style="flex: 1;">
               <label for="image_text_end">结束标记：</label>
-              <input id="image_text_end" type="text" class="text_pole" placeholder="）" /></input>
+              <input id="image_text_end" type="text" class="text_pole" placeholder="」,",）" /></input>
             </div>
           </div>
+          <small style="color: #888; display: block; margin-top: 5px;">
+            示例：开始填 <code>「,"</code>，结束填 <code>」,"</code> 可同时匹配「对话」和"对话"
+          </small>
 
         </div>
       </div>
@@ -204,6 +243,29 @@
 </div>
 
 <style>
+  /* 代码标签样式 */
+  .siliconflow-extension-settings code {
+    background: rgba(124, 58, 237, 0.2);
+    padding: 2px 6px;
+    border-radius: 4px;
+    font-family: 'Consolas', 'Monaco', monospace;
+    font-size: 0.85em;
+    color: #a78bfa;
+  }
+
+  /* 正则测试结果区域 */
+  #regex_test_result {
+    word-break: break-all;
+    white-space: pre-wrap;
+    font-family: 'Consolas', 'Monaco', monospace;
+  }
+
+  #regex_test_result:empty::before {
+    content: '(结果将显示在这里)';
+    color: rgba(255,255,255,0.3);
+    font-style: italic;
+  }
+
   .siliconflow-extension-settings .inline-drawer {
     margin-bottom: 5px;
   }
