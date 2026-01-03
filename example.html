@@ -6,19 +6,18 @@
     </div>
     <div class="inline-drawer-content" style="display: none;">
 
-      <!-- API 设置 --></!-->
+      </!-->
       <div class="inline-drawer">
         <div class="inline-drawer-toggle inline-drawer-header">
           <b>API 设置</b>
           <div class="inline-drawer-icon fa-solid fa-circle-chevron-down"></div>
         </div>
         <div class="inline-drawer-content" style="display: none;">
-
           <label for="siliconflow_api_key">API密钥：</label>
-          <input id="siliconflow_api_key" type="password" class="text_pole" placeholder="sk-xxxxxxxx" />
+          <input id="siliconflow_api_key" type="password" class="text_pole" placeholder="sk-xxxxxxxx">
 </input>
           <label for="siliconflow_api_url" style="margin-top: 10px;">API地址：</label>
-          <input id="siliconflow_api_url" type="text" class="text_pole" placeholder="https://api.siliconflow.cn/v1" /></input>
+          <input id="siliconflow_api_url" type="text" class="text_pole" placeholder="https://api.siliconflow.cn/v1"></input>
           <small style="color: #888; display: block; margin-top: 5px;">支持兼容 OpenAI 格式的 API 地址</small>
 
           <div style="display: flex; gap: 10px; margin-top: 15px; align-items: center;">
@@ -30,18 +29,16 @@
             </button>
             <span id="connection_status" style="margin-left: 10px; font-size: 12px;">未连接</span>
           </div>
-
         </div>
       </div>
 
-      <!-- TTS模型设置 --></!-->
+      </!-->
       <div class="inline-drawer">
         <div class="inline-drawer-toggle inline-drawer-header">
           <b>TTS模型设置</b>
           <div class="inline-drawer-icon fa-solid fa-circle-chevron-down"></div>
         </div>
         <div class="inline-drawer-content" style="display: none;">
-
           <label for="tts_model">TTS模型：</label>
           <div style="display: flex; gap: 5px; align-items: center;">
             <select id="tts_model" class="text_pole" style="flex: 1;">
@@ -60,7 +57,7 @@
             <span id="model_test_status" style="font-size: 12px;"></span>
           </div>
 
-          <hr style="margin: 15px 0; border-color: #444;" />
+          <hr style="margin: 15px 0; border-color: #444;">
 </hr>
           <label for="tts_voice">语音角色：</label>
           <div style="display: flex; gap: 5px; align-items: center;">
@@ -81,121 +78,122 @@
 
           <div style="margin-top: 15px;">
             <label for="tts_speed">语速（0.25-4.0）：<span id="tts_speed_value">1.0</span></label>
-            <input type="range" id="tts_speed" min="0.25" max="4" step="0.05" value="1.0" class="text_pole" /></input>
+            <input type="range" id="tts_speed" min="0.25" max="4" step="0.05" value="1.0" class="text_pole"></input>
           </div>
 
           <div style="margin-top: 10px;">
             <label for="tts_gain">音量增益（-10到10）：<span id="tts_gain_value">0</span></label>
-            <input type="range" id="tts_gain" min="-10" max="10" step="0.5" value="0" class="text_pole" /></input>
+            <input type="range" id="tts_gain" min="-10" max="10" step="0.5" value="0" class="text_pole"></input>
           </div>
-
         </div>
       </div>
 
-      <!-- 自动朗读设置 --></!-->
+      </!-->
       <div class="inline-drawer">
         <div class="inline-drawer-toggle inline-drawer-header">
           <b>自动朗读设置</b>
           <div class="inline-drawer-icon fa-solid fa-circle-chevron-down"></div>
         </div>
         <div class="inline-drawer-content" style="display: none;">
-
           <div style="margin: 10px 0;">
             <label class="checkbox_label">
-              <input type="checkbox" id="auto_play_audio" checked /></input>
+              <input type="checkbox" id="auto_play_audio" checked></input>
               <span>自动朗读角色消息</span>
             </label>
           </div>
 
           <div style="margin: 10px 0;">
             <label class="checkbox_label">
-              <input type="checkbox" id="auto_play_user" /></input>
+              <input type="checkbox" id="auto_play_user"></input>
               <span>自动朗读用户消息</span>
             </label>
           </div>
 
-          <hr style="margin: 15px 0; border-color: #444;" />
+          <hr style="margin: 15px 0; border-color: #444;">
 </hr>
-          <label><b>📌 文本提取设置</b></label>
-          <small style="color: #888; display: block; margin: 5px 0 10px 0;">
-            设置开始和结束标记后，只朗读标记内的文本<br/></br>
-            <strong>支持多组标记，用英文逗号 <code>,</code> 分隔</strong><br/></br>
-            例如：开始填 <code>「,（</code>，结束填 <code>」,）</code>
-          </small>
+          <label><b>文本截取设置</b></label>
+          <small style="color: #888; display: block; margin: 5px 0;">设置标记后只朗读标记内的文本，多个标记用英文逗号分隔</small>
           <div style="display: flex; gap: 10px; margin-top: 10px;">
             <div style="flex: 1;">
               <label for="image_text_start">开始标记：</label>
-              <input id="image_text_start" type="text" class="text_pole" placeholder="「,（,&quot;" /></input>
+              <input id="image_text_start" type="text" class="text_pole" placeholder="「,（,""></input>
             </div>
             <div style="flex: 1;">
               <label for="image_text_end">结束标记：</label>
-              <input id="image_text_end" type="text" class="text_pole" placeholder="」,）,&quot;" /></input>
+              <input id="image_text_end" type="text" class="text_pole" placeholder="」,）,""></input>
             </div>
           </div>
-
-          <hr style="margin: 20px 0; border-color: #444;" />
-</hr>
-          <!-- 正则屏蔽功能 --></!-->
-          <label><b>🚫 正则屏蔽规则</b></label>
-          <small style="color: #888; display: block; margin: 5px 0 10px 0;">
-            在朗读前移除匹配的内容（如思考过程、分析标签等）
+          <small style="color: #888; display: block; margin-top: 5px;">
+            示例：开始填 <code>「,（</code> 结束填 <code>」,）</code> 会同时提取「对话」和（旁白）
           </small>
-
-          <!-- 预设按钮 --></!-->
-          <div style="display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 15px;">
-            <button id="preset_exclude_think" class="menu_button" style="padding: 6px 12px; font-size: 0.8em;">
-              <i class="fa-solid fa-plus"></i> think
-            </button>
-            <button id="preset_exclude_thinking" class="menu_button" style="padding: 6px 12px; font-size: 0.8em;">
-              <i class="fa-solid fa-plus"></i> thinking
-            </button>
-            <button id="preset_exclude_cot" class="menu_button" style="padding: 6px 12px; font-size: 0.8em;">
-              <i class="fa-solid fa-plus"></i> 小CoT注释
-            </button>
-            <button id="preset_exclude_analysis" class="menu_button" style="padding: 6px 12px; font-size: 0.8em;">
-              <i class="fa-solid fa-plus"></i> analysis
-            </button>
-          </div>
-
-          <!-- 自定义规则输入 --></!-->
-          <div style="background: rgba(0,0,0,0.15); padding: 12px; border-radius: 8px; margin-bottom: 10px;">
-            <label style="font-size: 0.85em;">自定义规则：</label>
-            <div style="display: flex; gap: 8px; margin-top: 8px;">
-              <input id="exclude_pattern_name" type="text" class="text_pole" placeholder="规则名称" style="flex: 1;" /></input>
-              <input id="exclude_pattern_regex" type="text" class="text_pole" placeholder="正则表达式" style="flex: 2;" /></input>
-              <button id="add_exclude_pattern" class="menu_button" style="white-space: nowrap;">
-                <i class="fa-solid fa-plus"></i> 添加
-              </button>
-            </div>
-            <small style="color: #888; display: block; margin-top: 8px;">
-              示例：<code>&lt;mytag&gt;[\s\S]*?&lt;/mytag&gt;</code> 会移除所有 mytag 标签内容
-            </small>
-          </div>
-
-          <!-- 已添加的规则列表 --></!-->
-          <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
-            <label style="font-size: 0.85em; margin: 0;">已添加的规则：</label>
-            <button id="clear_all_patterns" class="menu_button" style="padding: 4px 10px; font-size: 0.75em;">
-              <i class="fa-solid fa-trash"></i> 清空全部
-            </button>
-          </div>
-          <div id="exclude_patterns_list" style="max-height: 200px; overflow-y: auto;">
-            <small style="color: var(--sf-text-secondary);">暂无屏蔽规则，点击上方预设按钮快速添加</small>
-          </div>
-
         </div>
       </div>
 
-      <!-- 克隆音色功能 --></!-->
+      </!-->
+      <div class="inline-drawer">
+        <div class="inline-drawer-toggle inline-drawer-header">
+          <b>正则屏蔽设置</b>
+          <div class="inline-drawer-icon fa-solid fa-circle-chevron-down"></div>
+        </div>
+        <div class="inline-drawer-content" style="display: none;">
+          <small style="color: #888; display: block; margin-bottom: 10px;">
+            在朗读前移除匹配的内容，支持正则表达式
+          </small>
+
+          </!-->
+          <label><b>快速添加预设规则：</b></label>
+          <div style="display: flex; flex-wrap: wrap; gap: 8px; margin: 10px 0;">
+            <button class="menu_button preset-filter-btn" data-name="思考标签" data-pattern="">
+              🧠 思考标签
+            </button>
+            <button class="menu_button preset-filter-btn" data-name="HTML注释" data-pattern="">
+              💭 HTML注释
+            </button>
+            <button class="menu_button preset-filter-btn" data-name="方括号内容" data-pattern="\[[\s\S]*?\]">
+              📦 方括号内容
+            </button>
+            <button class="menu_button preset-filter-btn" data-name="星号动作" data-pattern="\*[^*]+\*">
+              ✨ 星号动作
+            </button>
+            <button class="menu_button preset-filter-btn" data-name="OOC内容" data-pattern="\(OOC:[\s\S]*?\)">
+              🎭 OOC内容
+            </button>
+          </div>
+
+          <hr style="margin: 15px 0; border-color: #444;">
+</hr>
+          </!-->
+          <label><b>添加自定义规则：</b></label>
+          <div style="display: flex; gap: 10px; margin-top: 10px;">
+            <input id="filter_rule_name" type="text" class="text_pole" placeholder="规则名称" style="flex: 1;"></input>
+            <input id="filter_rule_pattern" type="text" class="text_pole" placeholder="正则表达式" style="flex: 2;"></input>
+            <button id="add_filter_rule" class="menu_button">
+              <i class="fa-solid fa-plus"></i> 添加
+            </button>
+          </div>
+          <small style="color: #888; display: block; margin-top: 5px;">
+            示例：名称填 <code>analysis标签</code>，正则填 <code><analysis>[\s\S]*?</analysis></code>
+          </small>
+
+          <hr style="margin: 15px 0; border-color: #444;">
+</hr>
+          </!-->
+          <label><b>已启用的屏蔽规则：</b></label>
+          <div id="filter_rules_list" style="margin-top: 10px; max-height: 200px; overflow-y: auto;">
+            <small>暂无屏蔽规则</small>
+          </div>
+        </div>
+      </div>
+
+      </!-->
       <div class="inline-drawer">
         <div class="inline-drawer-toggle inline-drawer-header">
           <b>克隆音色功能</b>
           <div class="inline-drawer-icon fa-solid fa-circle-chevron-down"></div>
         </div>
         <div class="inline-drawer-content" style="display: none;">
-
           <label for="clone_voice_name">音色名称：</label>
-          <input id="clone_voice_name" type="text" class="text_pole" placeholder="my_voice (仅英文、数字、下划线、连字符)" /></input>
+          <input id="clone_voice_name" type="text" class="text_pole" placeholder="my_voice (仅英文、数字、下划线、连字符)"></input>
           <small style="color: #888; display: block; margin-top: 3px;">只能包含英文字母、数字、下划线和连字符，最多64个字符</small>
 
           <label for="clone_voice_text" style="margin-top: 10px;">参考文本：</label>
@@ -203,7 +201,7 @@
           <small style="color: #888; display: block; margin-top: 3px;">输入参考音频中说的话，用于音色克隆</small>
 
           <label for="clone_voice_audio" style="margin-top: 10px;">参考音频：</label>
-          <input id="clone_voice_audio" type="file" accept="audio/*" class="text_pole" /></input>
+          <input id="clone_voice_audio" type="file" accept="audio/*" class="text_pole"></input>
           <small style="color: #888; display: block; margin-top: 3px;">上传一段清晰的语音样本（建议5-30秒）</small>
 
           <div style="display: flex; gap: 10px; margin-top: 15px;">
@@ -215,24 +213,22 @@
             </button>
           </div>
 
-          <hr style="margin: 15px 0; border-color: #444;" />
-</hr>
+          <hr style="margin: 15px 0; border-color: #444;">
+
           <label><b>已克隆的音色：</b></label>
           <div id="custom_voices_list" style="margin-top: 10px; max-height: 200px; overflow-y: auto;">
             <small>暂无自定义音色</small>
           </div>
-
         </div>
       </div>
 
-      <!-- TTS测试 --></!-->
+      </!-->
       <div class="inline-drawer">
         <div class="inline-drawer-toggle inline-drawer-header">
           <b>TTS测试</b>
           <div class="inline-drawer-icon fa-solid fa-circle-chevron-down"></div>
         </div>
         <div class="inline-drawer-content" style="display: none;">
-
           <label for="tts_test_text">测试文本：</label>
           <textarea id="tts_test_text" class="text_pole" rows="3" placeholder="输入测试文本...">你好，这是一个测试语音。</textarea>
 
@@ -243,16 +239,15 @@
           </div>
 
           <div id="tts_output" style="margin-top: 10px;"></div>
-
         </div>
       </div>
 
-      <!-- 隐藏字段 --></!-->
-      <input type="hidden" id="response_format" value="mp3" /></input>
-      <input type="hidden" id="sample_rate" value="32000" /></input>
-      <input type="hidden" id="image_size" value="512" /></input>
-      <input type="hidden" id="generation_frequency" value="5" />
-</input>
+      </!-->
+      <input type="hidden" id="response_format" value="mp3"></input>
+      <input type="hidden" id="sample_rate" value="32000"></input>
+      <input type="hidden" id="image_size" value="512"></input>
+      <input type="hidden" id="generation_frequency" value="5">
+
     </div>
   </div>
 </div>
