@@ -35,7 +35,7 @@ const defaultSettings = {
   customVoices: [] 
 };
 
-// 通用预设音色列表（适用于大多数 SiliconFlow/OpenAI 兼容模型）
+// 通用预设音色列表
 const COMMON_VOICES = {
   "alex": "Alex (男声)",
   "anna": "Anna (女声)",
@@ -64,13 +64,12 @@ async function loadSettings() {
   
   // 设置选中的模型
   const savedModel = extension_settings[extensionName].ttsModel || defaultSettings.ttsModel;
-  // 如果下拉框里没有这个模型，手动加进去
   if ($(`#tts_model option[value="${savedModel}"]`).length === 0) {
     $("#tts_model").append(new Option(savedModel, savedModel));
   }
   $("#tts_model").val(savedModel);
 
-  $("#tts_voice").val(extension_settings[extensionName].ttsVoice || defaultSettings.ttsVoice);
+  // 其他数值设置
   $("#tts_speed").val(extension_settings[extensionName].ttsSpeed || defaultSettings.ttsSpeed);
   $("#tts_speed_value").text(extension_settings[extensionName].ttsSpeed || defaultSettings.ttsSpeed);
   $("#tts_gain").val(extension_settings[extensionName].ttsGain || defaultSettings.ttsGain);
@@ -80,7 +79,8 @@ async function loadSettings() {
   $("#auto_play_audio").prop("checked", extension_settings[extensionName].autoPlay !== false);
   $("#auto_play_user").prop("checked", extension_settings[extensionName].autoPlayUser === true);
   
-  updateVoiceOptions();
+  // 关键修复：最后再更新音色列表，并传入当前保存的设置
+  updateVoiceOptions(extension_settings[extensionName].ttsVoice || defaultSettings.ttsVoice);
 }
 
 // 辅助函数：更新模型下拉框
@@ -98,12 +98,10 @@ function updateModelSelect(models) {
         if (modelId === "FunAudioLLM/CosyVoice2-0.5B") hasCosy = true;
     });
 
-    // 兜底：确保有默认模型
     if (!hasCosy && models.length === 0) {
         $select.append(new Option("FunAudioLLM/CosyVoice2-0.5B", "FunAudioLLM/CosyVoice2-0.5B"));
     }
 
-    // 恢复选中
     if (currentVal && models.includes(currentVal)) {
         $select.val(currentVal);
     } else if ($select.find('option').length > 0) {
@@ -155,7 +153,6 @@ async function fetchRemoteModels() {
         }
 
         const modelIds = modelList.map(m => m.id).sort();
-        console.log("获取到的模型:", modelIds);
         
         extension_settings[extensionName].cachedModels = modelIds;
         saveSettingsDebounced();
@@ -171,23 +168,25 @@ async function fetchRemoteModels() {
     }
 }
 
-// 更新音色选项 (通用版，不依赖特定模型)
-function updateVoiceOptions() {
+// 更新音色选项 (逻辑修复版)
+function updateVoiceOptions(targetVoice = null) {
   const voiceSelect = $("#tts_voice");
-  const currentValue = voiceSelect.val();
   
+  // 1. 确定我们要选中的值：优先使用传入的值，其次是当前UI的值，最后是设置里的值
+  let voiceToSelect = targetVoice || voiceSelect.val() || extension_settings[extensionName].ttsVoice || "alex";
+  
+  // 2. 清空并重新生成列表
   voiceSelect.empty();
   
-  // 1. 添加通用预设音色
+  // 添加通用预设音色
   voiceSelect.append('<optgroup label="预设音色">');
   Object.entries(COMMON_VOICES).forEach(([value, name]) => {
     voiceSelect.append(`<option value="${value}">${name}</option>`);
   });
   voiceSelect.append('</optgroup>');
   
-  // 2. 添加自定义音色
+  // 添加自定义音色
   const customVoices = extension_settings[extensionName].customVoices || [];
-  
   if (customVoices.length > 0) {
     voiceSelect.append('<optgroup label="自定义音色">');
     customVoices.forEach(voice => {
@@ -198,12 +197,16 @@ function updateVoiceOptions() {
     voiceSelect.append('</optgroup>');
   }
   
-  // 3. 恢复之前的选择
-  if (currentValue && voiceSelect.find(`option[value="${currentValue}"]`).length > 0) {
-    voiceSelect.val(currentValue);
-  } else {
-    voiceSelect.val("alex");
+  // 3. 尝试设置选中值
+  voiceSelect.val(voiceToSelect);
+  
+  // 4. 如果设置失败（比如该音色不存在了），默认选中第一个
+  if (!voiceSelect.val()) {
+      voiceSelect.val("alex");
   }
+  
+  // 5. 同步回设置
+  extension_settings[extensionName].ttsVoice = voiceSelect.val();
 }
 
 // 保存设置
@@ -211,7 +214,7 @@ function saveSettings() {
   extension_settings[extensionName].apiKey = $("#siliconflow_api_key").val();
   extension_settings[extensionName].apiUrl = $("#siliconflow_api_url").val();
   extension_settings[extensionName].ttsModel = $("#tts_model").val();
-  extension_settings[extensionName].ttsVoice = $("#tts_voice").val();
+  extension_settings[extensionName].ttsVoice = $("#tts_voice").val(); // 此时 tts_voice 一定有值
   extension_settings[extensionName].ttsSpeed = parseFloat($("#tts_speed").val());
   extension_settings[extensionName].ttsGain = parseFloat($("#tts_gain").val());
   extension_settings[extensionName].textStart = $("#image_text_start").val();
@@ -277,7 +280,7 @@ async function generateTTS(text) {
     const speed = parseFloat($("#tts_speed").val()) || 1.0;
     const gain = parseFloat($("#tts_gain").val()) || 0;
     
-    // 构造 voice 参数 - 智能适配
+    // 构造 voice 参数
     let voiceParam;
     
     // 情况A: 自定义音色或URI
@@ -365,7 +368,6 @@ function setupMessageListener() {
       const textEnd = $("#image_text_end").val();
       
       if (textStart && textEnd) {
-        // 简单正则提取
         const escapeRegex = (str) => str.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
         const regex = new RegExp(`${escapeRegex(textStart)}(.*?)${escapeRegex(textEnd)}`, 'g');
         const matches = message.match(regex);
@@ -376,7 +378,6 @@ function setupMessageListener() {
             return;
         }
       }
-      // 无标记或无匹配，读全文
       generateTTS(message);
     }, 1000);
   });
@@ -532,8 +533,11 @@ jQuery(async () => {
   $("#siliconflow_api_url").on("change", function() {
       extension_settings[extensionName].apiUrl = $(this).val();
   });
+  
+  // 关键修复：当模型改变时，也刷新一下音色列表，并保存设置
   $("#tts_model").on("change", function() {
       extension_settings[extensionName].ttsModel = $(this).val();
+      updateVoiceOptions(); // 确保音色列表保持可见
   });
   
   $("#upload_voice").on("click", uploadVoice);
