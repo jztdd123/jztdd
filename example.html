@@ -107,16 +107,23 @@
                 
                 <hr class="sysHR">
                 
-                <!-- 文本截取设置 -->
+<!-- 文本截取设置 -->
                 <div class="sub-section">
-                    <h4>文本截取设置</h4>
+                    <h4>文本截取/提取设置</h4>
                     <div class="setting-item">
-                        <label for="image_text_start">开始标记：</label>
-                        <input type="text" id="image_text_start" placeholder="例如：（ 或 " value="" />
+                        <small style="margin-bottom: 5px; display: block;">
+                            只朗读标记内的文字。支持多组标记，用<b>逗号</b>分隔。<br>
+                            例如想朗读 <b>“对话”</b> 和 <b>(心声)</b>：<br>
+                            开始填：<code>“,(</code> &nbsp;&nbsp; 结束填：<code>”,)</code>
+                        </small>
                     </div>
                     <div class="setting-item">
-                        <label for="image_text_end">结束标记：</label>
-                        <input type="text" id="image_text_end" placeholder="例如：） 或 " value="" />
+                        <label for="image_text_start">开始标记（用逗号分隔）：</label>
+                        <input type="text" id="image_text_start" placeholder="例如：“, (, 「" value="" />
+                    </div>
+                    <div class="setting-item">
+                        <label for="image_text_end">结束标记（用逗号分隔）：</label>
+                        <input type="text" id="image_text_end" placeholder="例如：”, ), 」" value="" />
                     </div>
                 </div>
                 
@@ -133,3 +140,4 @@
         </div>
     </div>
 </div>
+
