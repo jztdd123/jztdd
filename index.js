@@ -26,13 +26,14 @@ const defaultSettings = {
   sampleRate: 32000,
   imageModel: "",
   imageSize: "512",
-  textStart: "（",
-  textEnd: "）",
+  textStart: "「",
+  textEnd: "」",
   generationFrequency: 5,
   autoPlay: true,
   autoPlayUser: false,
   customVoices: [],
-  availableModels: []
+  availableModels: [],
+  regexFilter: "|\\*[^*]+\\*"
 };
 
 // TTS模型和音色配置
@@ -51,6 +52,129 @@ const TTS_MODELS = {
     }
   }
 };
+
+// 预处理文本：应用正则屏蔽
+function preprocessText(text) {
+  const regexPattern = $("#regex_filter").val().trim();
+
+  if (!regexPattern) {
+    return text;
+  }
+
+  try {
+    const regex = new RegExp(regexPattern, 'gi');
+    const filtered = text.replace(regex, '');
+    console.log('正则屏蔽前:', text.substring(0, 100));
+    console.log('正则屏蔽后:', filtered.substring(0, 100));
+    return filtered.trim();
+  } catch (error) {
+    console.error('正则表达式错误:', error);
+    return text;
+  }
+}
+
+// 提取标记内文本（支持多标记对）
+function extractMarkedText(message) {
+  const textStartInput = $("#image_text_start").val().trim();
+  const textEndInput = $("#image_text_end").val().trim();
+
+  if (!textStartInput || !textEndInput) {
+    return null;
+  }
+
+  // 解析多标记对（用逗号分隔）
+  const startMarkers = textStartInput.split(',').map(s => s.trim()).filter(s => s);
+  const endMarkers = textEndInput.split(',').map(s => s.trim()).filter(s => s);
+
+  if (startMarkers.length !== endMarkers.length) {
+    console.warn('开始标记和结束标记数量不匹配，使用较少的一方');
+  }
+
+  let extractedTexts = [];
+  const pairCount = Math.min(startMarkers.length, endMarkers.length);
+
+  for (let p = 0; p < pairCount; p++) {
+    const textStart = startMarkers[p];
+    const textEnd = endMarkers[p];
+
+    console.log(`处理第${p + 1}组标记: "${textStart}" ... "${textEnd}"`);
+
+    if (textStart === textEnd) {
+      // 相同标记：配对算法
+      let insideQuote = false;
+      let currentText = '';
+
+      for (let i = 0; i < message.length; i++) {
+        const char = message[i];
+        const matchesMarker = message.substring(i, i + textStart.length) === textStart;
+
+        if (matchesMarker) {
+          if (!insideQuote) {
+            insideQuote = true;
+            currentText = '';
+            i += textStart.length - 1;
+          } else {
+            if (currentText.trim()) {
+              extractedTexts.push(currentText.trim());
+            }
+            insideQuote = false;
+            currentText = '';
+            i += textStart.length - 1;
+          }
+        } else if (insideQuote) {
+          currentText += char;
+        }
+      }
+    } else {
+      // 不同标记：正则匹配
+      const escapeRegex = (str) => str.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+      const escapedStart = escapeRegex(textStart);
+      const escapedEnd = escapeRegex(textEnd);
+
+      const regex = new RegExp(`${escapedStart}([\\s\\S]*?)${escapedEnd}`, 'g');
+      let match;
+
+      while ((match = regex.exec(message)) !== null) {
+        const cleanText = match[1].trim();
+        if (cleanText) {
+          extractedTexts.push(cleanText);
+        }
+      }
+    }
+  }
+
+  if (extractedTexts.length > 0) {
+    console.log(`共提取到 ${extractedTexts.length} 段文本`);
+    return extractedTexts.join(' ');
+  }
+
+  return '';
+}
+
+// 处理消息文本的主函数
+function processMessageForTTS(message) {
+  // 1. 先应用正则屏蔽
+  let processedText = preprocessText(message);
+
+  if (!processedText.trim()) {
+    console.log('正则屏蔽后文本为空');
+    return null;
+  }
+
+  // 2. 提取标记内文本
+  const markedText = extractMarkedText(processedText);
+
+  if (markedText === null) {
+    return processedText;
+  }
+
+  if (markedText === '') {
+    console.log('设置了标记但未找到匹配内容');
+    return null;
+  }
+
+  return markedText;
+}
 
 // 从API获取可用模型
 async function fetchAvailableModels() {
@@ -80,7 +204,6 @@ async function fetchAvailableModels() {
     const data = await response.json();
     console.log("获取到的模型列表:", data);
 
-    // 过滤出TTS相关模型
     const allModels = data.data || data.results || data.models || [];
     const ttsModels = allModels.filter(model => {
       const modelId = (model.id || model.name || "").toLowerCase();
@@ -109,12 +232,10 @@ function updateModelDropdown(models) {
 
   modelSelect.empty();
 
-  // 添加默认选项
   modelSelect.append('<optgroup label="默认模型">');
   modelSelect.append('<option value="FunAudioLLM/CosyVoice2-0.5B">CosyVoice2-0.5B (默认)</option>');
   modelSelect.append('</optgroup>');
 
-  // 添加API获取的模型
   if (models && models.length > 0) {
     modelSelect.append('<optgroup label="API获取的模型">');
     models.forEach(model => {
@@ -127,12 +248,10 @@ function updateModelDropdown(models) {
     modelSelect.append('</optgroup>');
   }
 
-  // 恢复之前的选择
   if (currentValue && modelSelect.find(`option[value="${currentValue}"]`).length > 0) {
     modelSelect.val(currentValue);
   }
 
-  // 保存获取到的模型到设置
   extension_settings[extensionName].availableModels = models;
   saveSettingsDebounced();
 }
@@ -186,7 +305,6 @@ async function testCurrentModel() {
       $("#model_test_status").text("✓ 模型可用").css("color", "green");
       toastr.success(`模型 "${model}" 测试成功！`, "模型测试");
 
-      // 播放测试音频
       const audioUrl = URL.createObjectURL(audioBlob);
       const audio = new Audio(audioUrl);
       audio.play().catch(err => console.log("自动播放被阻止:", err));
@@ -250,7 +368,6 @@ function updateVoiceOptionsFromAPI(voices) {
     voiceSelect.append('</optgroup>');
   }
 
-  // 添加自定义音色
   const customVoices = extension_settings[extensionName].customVoices || [];
   if (customVoices.length > 0) {
     voiceSelect.append('<optgroup label="自定义音色">');
@@ -275,7 +392,6 @@ async function loadSettings() {
     Object.assign(extension_settings[extensionName], defaultSettings);
   }
 
-  // 更新UI
   $("#siliconflow_api_key").val(extension_settings[extensionName].apiKey || "");
   $("#siliconflow_api_url").val(extension_settings[extensionName].apiUrl || defaultSettings.apiUrl);
   $("#tts_model").val(extension_settings[extensionName].ttsModel || defaultSettings.ttsModel);
@@ -292,8 +408,8 @@ async function loadSettings() {
   $("#generation_frequency").val(extension_settings[extensionName].generationFrequency || defaultSettings.generationFrequency);
   $("#auto_play_audio").prop("checked", extension_settings[extensionName].autoPlay !== false);
   $("#auto_play_user").prop("checked", extension_settings[extensionName].autoPlayUser === true);
+  $("#regex_filter").val(extension_settings[extensionName].regexFilter || defaultSettings.regexFilter);
 
-  // 恢复已保存的模型列表
   if (extension_settings[extensionName].availableModels && extension_settings[extensionName].availableModels.length > 0) {
     updateModelDropdown(extension_settings[extensionName].availableModels);
   }
@@ -308,7 +424,6 @@ function updateVoiceOptions() {
   const currentValue = voiceSelect.val();
   voiceSelect.empty();
 
-  // 添加预设音色
   if (TTS_MODELS[model] && TTS_MODELS[model].voices) {
     voiceSelect.append('<optgroup label="预设音色">');
     Object.entries(TTS_MODELS[model].voices).forEach(([value, name]) => {
@@ -316,7 +431,6 @@ function updateVoiceOptions() {
     });
     voiceSelect.append('</optgroup>');
   } else {
-    // 如果没有预设，添加默认音色
     voiceSelect.append('<optgroup label="默认音色">');
     voiceSelect.append('<option value="alex">Alex (男声)</option>');
     voiceSelect.append('<option value="anna">Anna (女声)</option>');
@@ -325,7 +439,6 @@ function updateVoiceOptions() {
     voiceSelect.append('</optgroup>');
   }
 
-  // 添加自定义音色
   const customVoices = extension_settings[extensionName].customVoices || [];
   console.log(`更新音色选项，自定义音色数量: ${customVoices.length}`);
 
@@ -340,7 +453,6 @@ function updateVoiceOptions() {
     voiceSelect.append('</optgroup>');
   }
 
-  // 恢复之前的选择或设置默认值
   if (currentValue && voiceSelect.find(`option[value="${currentValue}"]`).length > 0) {
     voiceSelect.val(currentValue);
   } else {
@@ -364,6 +476,7 @@ function saveSettings() {
   extension_settings[extensionName].generationFrequency = parseInt($("#generation_frequency").val());
   extension_settings[extensionName].autoPlay = $("#auto_play_audio").prop("checked");
   extension_settings[extensionName].autoPlayUser = $("#auto_play_user").prop("checked");
+  extension_settings[extensionName].regexFilter = $("#regex_filter").val();
 
   saveSettingsDebounced();
   console.log("设置已保存");
@@ -505,35 +618,9 @@ async function generateTTS(text) {
   }
 }
 
-// 监听消息事件，自动提取文本并生成语音
+// 监听消息事件
 function setupMessageListener() {
   console.log('设置消息监听器');
-  console.log('事件类型:', event_types);
-  console.log('eventSource 对象:', eventSource);
-
-  try {
-    console.log('尝试监听所有消息相关事件...');
-
-    if (event_types.MESSAGE_SENT) {
-      eventSource.on(event_types.MESSAGE_SENT, () => {
-        console.log('检测到MESSAGE_SENT事件');
-      });
-    }
-
-    if (event_types.MESSAGE_RECEIVED) {
-      eventSource.on(event_types.MESSAGE_RECEIVED, () => {
-        console.log('检测到MESSAGE_RECEIVED事件');
-      });
-    }
-
-    if (event_types.CHAT_CHANGED) {
-      eventSource.on(event_types.CHAT_CHANGED, () => {
-        console.log('检测到CHAT_CHANGED事件');
-      });
-    }
-  } catch (error) {
-    console.error('设置测试监听器出错:', error);
-  }
 
   eventSource.on(event_types.CHARACTER_MESSAGE_RENDERED, async (messageId) => {
     console.log('角色消息渲染:', messageId);
@@ -542,8 +629,6 @@ function setupMessageListener() {
       console.log('消息已处理，跳过:', messageId);
       return;
     }
-
-    console.log('新消息，准备处理:', messageId);
 
     const autoPlay = $("#auto_play_audio").prop("checked");
     if (!autoPlay) {
@@ -556,100 +641,27 @@ function setupMessageListener() {
     }
 
     audioState.processingTimeout = setTimeout(() => {
-      console.log('延时处理开始:', messageId);
       if (audioState.lastProcessedMessageId === messageId) {
-        console.log('消息在延迟期间已被处理，跳过');
         return;
       }
 
       audioState.lastProcessedMessageId = messageId;
-      console.log('处理消息:', messageId);
-      const messageElement = $(`.mes[mesid="${messageId}"]`);
-      console.log('查找消息元素:', messageElement.length > 0 ? '找到' : '未找到');
 
+      const messageElement = $(`.mes[mesid="${messageId}"]`);
       const message = messageElement.find('.mes_text').text();
-      console.log('消息内容长度:', message ? message.length : 0);
 
       if (!message) {
         console.log('消息内容为空');
         return;
       }
 
-      const textStart = $("#image_text_start").val();
-      const textEnd = $("#image_text_end").val();
+      const textToSpeak = processMessageForTTS(message);
 
-      console.log('检查标记:', { textStart, textEnd, 消息内容: message.substring(0, 100) });
-
-      if (textStart && textEnd) {
-        let extractedTexts = [];
-
-        console.log('原始消息:', message);
-        console.log('消息中的引号位置:');
-        for (let i = 0; i < message.length; i++) {
-          if (message[i] === '"' || message[i] === '"' || message[i] === '"' || message[i] === '"') {
-            console.log(`位置${i}: "${message[i]}" (字符码: ${message[i].charCodeAt(0)})`);
-          }
-        }
-
-        if (textStart === textEnd) {
-          let insideQuote = false;
-          let currentText = '';
-          let pairCount = 0;
-
-          for (let i = 0; i < message.length; i++) {
-            const char = message[i];
-
-            if (char === textStart) {
-              if (!insideQuote) {
-                console.log(`位置${i}: 开始第${pairCount + 1}对引号`);
-                insideQuote = true;
-                currentText = '';
-              } else {
-                console.log(`位置${i}: 结束第${pairCount + 1}对引号，内容: "${currentText}"`);
-                if (currentText.trim()) {
-                  extractedTexts.push(currentText.trim());
-                  pairCount++;
-                  console.log(`提取第${pairCount}对引号内容:`, currentText.trim());
-                }
-                insideQuote = false;
-                currentText = '';
-              }
-            } else if (insideQuote) {
-              currentText += char;
-            }
-          }
-        } else {
-          const escapeRegex = (str) => str.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-          const escapedStart = escapeRegex(textStart);
-          const escapedEnd = escapeRegex(textEnd);
-
-          const regex = new RegExp(`${escapedStart}(.*?)${escapedEnd}`, 'g');
-          const matches = message.match(regex);
-
-          if (matches && matches.length > 0) {
-            console.log(`找到${matches.length}个标记内容`);
-
-            matches.forEach(match => {
-              const cleanText = match.replace(textStart, '').replace(textEnd, '').trim();
-              if (cleanText) {
-                extractedTexts.push(cleanText);
-              }
-            });
-          }
-        }
-
-        if (extractedTexts.length > 0) {
-          const finalText = extractedTexts.join(' ');
-          console.log('自动朗读标记内文本:', finalText);
-          generateTTS(finalText);
-          return;
-        }
-
-        console.log('设置了标记但未找到匹配内容，跳过朗读');
+      if (textToSpeak) {
+        console.log('准备朗读:', textToSpeak.substring(0, 100));
+        generateTTS(textToSpeak);
       } else {
-        console.log('未设置标记，自动朗读全文:', message.substring(0, 100));
-        console.log('开始生成TTS...');
-        generateTTS(message);
+        console.log('无需朗读的内容');
       }
     }, 1000);
   });
@@ -658,105 +670,29 @@ function setupMessageListener() {
     console.log('用户消息渲染:', messageId);
 
     if (audioState.lastProcessedUserMessageId === messageId) {
-      console.log('用户消息已处理，跳过:', messageId);
       return;
     }
 
     const autoPlayUser = $("#auto_play_user").prop("checked");
     if (!autoPlayUser) {
-      console.log('用户消息自动朗读未开启');
       return;
     }
-    console.log('用户消息自动朗读已开启');
 
     audioState.lastProcessedUserMessageId = messageId;
 
     setTimeout(() => {
-      console.log('用户消息延时处理开始:', messageId);
       const messageElement = $(`.mes[mesid="${messageId}"]`);
-      console.log('用户消息元素:', messageElement.length > 0 ? '找到' : '未找到');
-
       const message = messageElement.find('.mes_text').text();
-      console.log('用户消息内容长度:', message ? message.length : 0);
+
       if (!message) {
-        console.log('用户消息内容为空');
         return;
       }
 
-      const textStart = $("#image_text_start").val();
-      const textEnd = $("#image_text_end").val();
+      const textToSpeak = processMessageForTTS(message);
 
-      console.log('用户消息 - 检查标记:', { textStart, textEnd, 消息内容: message.substring(0, 100) });
-
-      if (textStart && textEnd) {
-        let extractedTexts = [];
-
-        console.log('用户原始消息:', message);
-        console.log('用户消息中的引号位置:');
-        for (let i = 0; i < message.length; i++) {
-          if (message[i] === '"' || message[i] === '"' || message[i] === '"' || message[i] === '"') {
-            console.log(`位置${i}: "${message[i]}" (字符码: ${message[i].charCodeAt(0)})`);
-          }
-        }
-
-        if (textStart === textEnd) {
-          let insideQuote = false;
-          let currentText = '';
-          let pairCount = 0;
-
-          for (let i = 0; i < message.length; i++) {
-            const char = message[i];
-
-            if (char === textStart) {
-              if (!insideQuote) {
-                console.log(`用户消息 - 位置${i}: 开始第${pairCount + 1}对引号`);
-                insideQuote = true;
-                currentText = '';
-              } else {
-                console.log(`用户消息 - 位置${i}: 结束第${pairCount + 1}对引号，内容: "${currentText}"`);
-                if (currentText.trim()) {
-                  extractedTexts.push(currentText.trim());
-                  pairCount++;
-                  console.log(`用户消息 - 提取第${pairCount}对引号内容:`, currentText.trim());
-                }
-                insideQuote = false;
-                currentText = '';
-              }
-            } else if (insideQuote) {
-              currentText += char;
-            }
-          }
-        } else {
-          const escapeRegex = (str) => str.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-          const escapedStart = escapeRegex(textStart);
-          const escapedEnd = escapeRegex(textEnd);
-
-          const regex = new RegExp(`${escapedStart}(.*?)${escapedEnd}`, 'g');
-          const matches = message.match(regex);
-
-          if (matches && matches.length > 0) {
-            console.log(`用户消息 - 找到${matches.length}个标记内容`);
-
-            matches.forEach(match => {
-              const cleanText = match.replace(textStart, '').replace(textEnd, '').trim();
-              if (cleanText) {
-                extractedTexts.push(cleanText);
-              }
-            });
-          }
-        }
-
-        if (extractedTexts.length > 0) {
-          const finalText = extractedTexts.join(' ');
-          console.log('用户消息 - 自动朗读标记内文本:', finalText);
-          generateTTS(finalText);
-          return;
-        }
-
-        console.log('用户消息 - 设置了标记但未找到匹配内容，跳过朗读');
-      } else {
-        console.log('用户消息 - 未设置标记，自动朗读全文:', message.substring(0, 100));
-        generateTTS(message);
+      if (textToSpeak) {
+        console.log('用户消息准备朗读:', textToSpeak.substring(0, 100));
+        generateTTS(textToSpeak);
       }
     }, 500);
   });
@@ -1082,6 +1018,23 @@ jQuery(async () => {
     saveSettingsDebounced();
   });
 
+  // 正则屏蔽自动保存
+  $("#regex_filter").on("input", function() {
+    extension_settings[extensionName].regexFilter = $(this).val();
+    saveSettingsDebounced();
+  });
+
+  // 测试正则按钮
+  $("#test_regex").on("click", function() {
+    const testText = $("#regex_test_text").val();
+    if (!testText) {
+      $("#regex_test_result").text("请输入测试文本");
+      return;
+    }
+    const result = preprocessText(testText);
+    $("#regex_test_result").text(result || "(过滤后为空)");
+  });
+
   // 语速和音量滑块
   $("#tts_speed").on("input", function() {
     $("#tts_speed_value").text($(this).val());
@@ -1112,11 +1065,7 @@ jQuery(async () => {
   setupMessageListener();
 
   console.log("硅基流动插件已加载");
-  console.log("自动朗读功能已启用，请在控制台查看调试信息");
-  console.log('事件源:', eventSource);
-  console.log('事件类型:', event_types);
-  console.log('角色消息事件:', event_types.CHARACTER_MESSAGE_RENDERED);
-  console.log('用户消息事件:', event_types.USER_MESSAGE_RENDERED);
+  console.log("自动朗读功能已启用");
 });
 
 export { generateTTS };
